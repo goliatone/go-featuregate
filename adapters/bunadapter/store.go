@@ -9,6 +9,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/goliatone/go-featuregate/featureerrors"
 	"github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-featuregate/store"
 )
@@ -17,10 +18,10 @@ import (
 const DefaultTable = "feature_flags"
 
 // ErrDBRequired indicates the underlying Bun DB is missing.
-var ErrDBRequired = errors.New("bunadapter: db is required")
+var ErrDBRequired = featureerrors.ErrStoreRequired
 
 // ErrInvalidKey indicates a missing or invalid feature key.
-var ErrInvalidKey = errors.New("bunadapter: feature key required")
+var ErrInvalidKey = featureerrors.ErrInvalidKey
 
 // Store adapts Bun DB operations to featuregate overrides.
 type Store struct {
@@ -102,7 +103,7 @@ type FeatureFlagRecord struct {
 // Get implements store.Reader.
 func (s *Store) Get(ctx context.Context, key string, scopeSet gate.ScopeSet) (store.Override, error) {
 	if s == nil || s.db == nil {
-		return store.MissingOverride(), ErrDBRequired
+		return store.MissingOverride(), storeRequiredError(scopeSet, "get")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
@@ -122,7 +123,15 @@ func (s *Store) Get(ctx context.Context, key string, scopeSet gate.ScopeSet) (st
 			if errors.Is(err, sql.ErrNoRows) {
 				continue
 			}
-			return store.MissingOverride(), err
+			return store.MissingOverride(), featureerrors.WrapExternal(err, featureerrors.TextCodeStoreReadFailed, "bunadapter: read failed", map[string]any{
+				featureerrors.MetaAdapter:              "bun",
+				featureerrors.MetaStore:                "bun",
+				featureerrors.MetaTable:                s.table,
+				featureerrors.MetaFeatureKey:           strings.TrimSpace(key),
+				featureerrors.MetaFeatureKeyNormalized: normalized,
+				featureerrors.MetaScope:                scopeSet,
+				featureerrors.MetaOperation:            "get",
+			})
 		}
 		return overrideFromRecord(record), nil
 	}
@@ -132,7 +141,7 @@ func (s *Store) Get(ctx context.Context, key string, scopeSet gate.ScopeSet) (st
 // Set implements store.Writer.
 func (s *Store) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, enabled bool, actor gate.ActorRef) error {
 	if s == nil || s.db == nil {
-		return ErrDBRequired
+		return storeRequiredError(scopeSet, "set")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
@@ -145,7 +154,7 @@ func (s *Store) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, ena
 // Unset implements store.Writer.
 func (s *Store) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, actor gate.ActorRef) error {
 	if s == nil || s.db == nil {
-		return ErrDBRequired
+		return storeRequiredError(scopeSet, "unset")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
@@ -158,7 +167,7 @@ func (s *Store) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, a
 // Delete removes a stored override row.
 func (s *Store) Delete(ctx context.Context, key string, scopeSet gate.ScopeSet) error {
 	if s == nil || s.db == nil {
-		return ErrDBRequired
+		return storeRequiredError(scopeSet, "delete")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
@@ -173,7 +182,18 @@ func (s *Store) Delete(ctx context.Context, key string, scopeSet gate.ScopeSet) 
 		query = query.TableExpr(s.table)
 	}
 	_, err = query.Exec(ctx)
-	return err
+	if err != nil {
+		return featureerrors.WrapExternal(err, featureerrors.TextCodeStoreWriteFailed, "bunadapter: delete failed", map[string]any{
+			featureerrors.MetaAdapter:              "bun",
+			featureerrors.MetaStore:                "bun",
+			featureerrors.MetaTable:                s.table,
+			featureerrors.MetaFeatureKey:           strings.TrimSpace(key),
+			featureerrors.MetaFeatureKeyNormalized: normalized,
+			featureerrors.MetaScope:                scopeSet,
+			featureerrors.MetaOperation:            "delete",
+		})
+	}
+	return nil
 }
 
 func (s *Store) upsert(ctx context.Context, key string, scope scopeKey, enabled *bool, actor gate.ActorRef) error {
@@ -194,7 +214,18 @@ func (s *Store) upsert(ctx context.Context, key string, scope scopeKey, enabled 
 		query = query.TableExpr(s.table)
 	}
 	_, err := query.Exec(ctx)
-	return err
+	if err != nil {
+		return featureerrors.WrapExternal(err, featureerrors.TextCodeStoreWriteFailed, "bunadapter: upsert failed", map[string]any{
+			featureerrors.MetaAdapter:              "bun",
+			featureerrors.MetaStore:                "bun",
+			featureerrors.MetaTable:                s.table,
+			featureerrors.MetaFeatureKey:           key,
+			featureerrors.MetaFeatureKeyNormalized: key,
+			featureerrors.MetaScope:                scope,
+			featureerrors.MetaOperation:            "upsert",
+		})
+	}
+	return nil
 }
 
 func defaultUpdatedBy(actor gate.ActorRef) string {
@@ -211,9 +242,15 @@ func defaultUpdatedBy(actor gate.ActorRef) string {
 }
 
 func normalizeKey(key string) (string, error) {
-	normalized := gate.NormalizeKey(strings.TrimSpace(key))
+	trimmed := strings.TrimSpace(key)
+	normalized := gate.NormalizeKey(trimmed)
 	if normalized == "" {
-		return "", ErrInvalidKey
+		return "", featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "bunadapter: feature key required", map[string]any{
+			featureerrors.MetaFeatureKey:           trimmed,
+			featureerrors.MetaFeatureKeyNormalized: normalized,
+			featureerrors.MetaAdapter:              "bun",
+			featureerrors.MetaStore:                "bun",
+		})
 	}
 	return normalized, nil
 }
@@ -275,3 +312,12 @@ func overrideFromRecord(record FeatureFlagRecord) store.Override {
 }
 
 var _ store.ReadWriter = (*Store)(nil)
+
+func storeRequiredError(scopeSet gate.ScopeSet, operation string) error {
+	return featureerrors.WrapSentinel(featureerrors.ErrStoreRequired, "bunadapter: db is required", map[string]any{
+		featureerrors.MetaAdapter:   "bun",
+		featureerrors.MetaStore:     "bun",
+		featureerrors.MetaScope:     scopeSet,
+		featureerrors.MetaOperation: operation,
+	})
+}
