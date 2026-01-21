@@ -2,21 +2,21 @@ package resolver
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/goliatone/go-featuregate/activity"
 	"github.com/goliatone/go-featuregate/cache"
+	"github.com/goliatone/go-featuregate/featureerrors"
 	"github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-featuregate/scope"
 	"github.com/goliatone/go-featuregate/store"
 )
 
 // ErrInvalidKey signals an empty or invalid feature key.
-var ErrInvalidKey = errors.New("feature key required")
+var ErrInvalidKey = featureerrors.ErrInvalidKey
 
 // ErrStoreUnavailable signals a missing runtime override store.
-var ErrStoreUnavailable = errors.New("override store not configured")
+var ErrStoreUnavailable = featureerrors.ErrStoreUnavailable
 
 // DefaultResult captures a config default lookup.
 type DefaultResult struct {
@@ -169,15 +169,33 @@ func (g *Gate) ResolveWithTrace(ctx context.Context, key string, opts ...gate.Re
 
 // Set stores a runtime override.
 func (g *Gate) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, enabled bool, actor gate.ActorRef) error {
+	trimmed := strings.TrimSpace(key)
+	normalized := gate.NormalizeKey(trimmed)
 	if g.writer == nil {
-		return ErrStoreUnavailable
+		return featureerrors.WrapSentinel(featureerrors.ErrStoreUnavailable, "", map[string]any{
+			featureerrors.MetaFeatureKey:           trimmed,
+			featureerrors.MetaFeatureKeyNormalized: normalized,
+			featureerrors.MetaScope:                scopeSet,
+			featureerrors.MetaStore:                "override",
+			featureerrors.MetaOperation:            "set",
+		})
 	}
-	normalized := gate.NormalizeKey(key)
 	if normalized == "" {
-		return ErrInvalidKey
+		return featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "", map[string]any{
+			featureerrors.MetaFeatureKey:           trimmed,
+			featureerrors.MetaFeatureKeyNormalized: normalized,
+			featureerrors.MetaScope:                scopeSet,
+			featureerrors.MetaOperation:            "set",
+		})
 	}
 	if err := g.writer.Set(ctx, normalized, scopeSet, enabled, actor); err != nil {
-		return err
+		return featureerrors.WrapExternal(err, featureerrors.TextCodeStoreWriteFailed, "override store set failed", map[string]any{
+			featureerrors.MetaFeatureKey:           trimmed,
+			featureerrors.MetaFeatureKeyNormalized: normalized,
+			featureerrors.MetaScope:                scopeSet,
+			featureerrors.MetaStore:                "override",
+			featureerrors.MetaOperation:            "set",
+		})
 	}
 	if g.cache != nil {
 		g.cache.Delete(ctx, normalized, scopeSet)
@@ -195,15 +213,33 @@ func (g *Gate) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, enab
 
 // Unset clears a runtime override.
 func (g *Gate) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, actor gate.ActorRef) error {
+	trimmed := strings.TrimSpace(key)
+	normalized := gate.NormalizeKey(trimmed)
 	if g.writer == nil {
-		return ErrStoreUnavailable
+		return featureerrors.WrapSentinel(featureerrors.ErrStoreUnavailable, "", map[string]any{
+			featureerrors.MetaFeatureKey:           trimmed,
+			featureerrors.MetaFeatureKeyNormalized: normalized,
+			featureerrors.MetaScope:                scopeSet,
+			featureerrors.MetaStore:                "override",
+			featureerrors.MetaOperation:            "unset",
+		})
 	}
-	normalized := gate.NormalizeKey(key)
 	if normalized == "" {
-		return ErrInvalidKey
+		return featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "", map[string]any{
+			featureerrors.MetaFeatureKey:           trimmed,
+			featureerrors.MetaFeatureKeyNormalized: normalized,
+			featureerrors.MetaScope:                scopeSet,
+			featureerrors.MetaOperation:            "unset",
+		})
 	}
 	if err := g.writer.Unset(ctx, normalized, scopeSet, actor); err != nil {
-		return err
+		return featureerrors.WrapExternal(err, featureerrors.TextCodeStoreWriteFailed, "override store unset failed", map[string]any{
+			featureerrors.MetaFeatureKey:           trimmed,
+			featureerrors.MetaFeatureKeyNormalized: normalized,
+			featureerrors.MetaScope:                scopeSet,
+			featureerrors.MetaStore:                "override",
+			featureerrors.MetaOperation:            "unset",
+		})
 	}
 	aliasErr := g.unsetAliases(ctx, normalized, scopeSet, actor)
 	if g.cache != nil {
@@ -231,13 +267,23 @@ func (g *Gate) resolve(ctx context.Context, key string, opts ...gate.ResolveOpti
 		NormalizedKey: normalized,
 	}
 	if normalized == "" {
+		err := featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "", map[string]any{
+			featureerrors.MetaFeatureKey:           trimmed,
+			featureerrors.MetaFeatureKeyNormalized: normalized,
+			featureerrors.MetaOperation:            "resolve",
+		})
 		trace.Source = gate.ResolveSourceFallback
-		g.emitResolve(ctx, trace, ErrInvalidKey)
-		return false, trace, ErrInvalidKey
+		g.emitResolve(ctx, trace, err)
+		return false, trace, err
 	}
 
 	scopeSet, err := g.resolveScope(ctx, opts...)
 	if err != nil {
+		err = featureerrors.WrapExternal(err, featureerrors.TextCodeScopeResolveFailed, "scope resolution failed", map[string]any{
+			featureerrors.MetaFeatureKey:           trimmed,
+			featureerrors.MetaFeatureKeyNormalized: normalized,
+			featureerrors.MetaOperation:            "resolve_scope",
+		})
 		trace.Scope = scopeSet
 		trace.Source = gate.ResolveSourceFallback
 		g.emitResolve(ctx, trace, err)
@@ -266,26 +312,40 @@ func (g *Gate) resolve(ctx context.Context, key string, opts ...gate.ResolveOpti
 	if g.overrides != nil {
 		override, err := g.overrides.Get(ctx, normalized, scopeSet)
 		if err != nil {
-			storeErr = err
-			trace.Override.Error = err
+			storeErr = featureerrors.WrapExternal(err, featureerrors.TextCodeStoreReadFailed, "override store read failed", map[string]any{
+				featureerrors.MetaFeatureKey:           trimmed,
+				featureerrors.MetaFeatureKeyNormalized: normalized,
+				featureerrors.MetaScope:                scopeSet,
+				featureerrors.MetaStore:                "override",
+				featureerrors.MetaOperation:            "get",
+				featureerrors.MetaStrict:               g.strictStore,
+			})
+			trace.Override.Error = storeErr
 			if g.strictStore {
 				trace.Override.State = gate.OverrideStateMissing
 				trace.Source = gate.ResolveSourceFallback
-				g.emitResolve(ctx, trace, err)
-				return false, trace, err
+				g.emitResolve(ctx, trace, storeErr)
+				return false, trace, storeErr
 			}
 		} else {
 			override = normalizeOverride(override)
 			if override.State == gate.OverrideStateMissing {
 				aliasOverride, aliasErr := g.aliasOverride(ctx, normalized, scopeSet)
 				if aliasErr != nil {
-					storeErr = aliasErr
-					trace.Override.Error = aliasErr
+					storeErr = featureerrors.WrapExternal(aliasErr, featureerrors.TextCodeStoreReadFailed, "override store read failed", map[string]any{
+						featureerrors.MetaFeatureKey:           trimmed,
+						featureerrors.MetaFeatureKeyNormalized: normalized,
+						featureerrors.MetaScope:                scopeSet,
+						featureerrors.MetaStore:                "override",
+						featureerrors.MetaOperation:            "get_alias",
+						featureerrors.MetaStrict:               g.strictStore,
+					})
+					trace.Override.Error = storeErr
 					if g.strictStore {
 						trace.Override.State = gate.OverrideStateMissing
 						trace.Source = gate.ResolveSourceFallback
-						g.emitResolve(ctx, trace, aliasErr)
-						return false, trace, aliasErr
+						g.emitResolve(ctx, trace, storeErr)
+						return false, trace, storeErr
 					}
 				} else {
 					override = aliasOverride
@@ -312,6 +372,12 @@ func (g *Gate) resolve(ctx context.Context, key string, opts ...gate.ResolveOpti
 	}
 	def, err := defaults.Default(ctx, normalized)
 	if err != nil {
+		err = featureerrors.WrapExternal(err, featureerrors.TextCodeDefaultLookupFailed, "default lookup failed", map[string]any{
+			featureerrors.MetaFeatureKey:           trimmed,
+			featureerrors.MetaFeatureKeyNormalized: normalized,
+			featureerrors.MetaScope:                scopeSet,
+			featureerrors.MetaOperation:            "default",
+		})
 		trace.Default.Error = err
 		trace.Source = gate.ResolveSourceFallback
 		g.emitResolve(ctx, trace, err)
