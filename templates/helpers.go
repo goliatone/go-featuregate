@@ -7,7 +7,7 @@ import (
 
 	"github.com/flosch/pongo2/v6"
 
-	"github.com/goliatone/go-featuregate/featureerrors"
+	"github.com/goliatone/go-featuregate/ferrors"
 	"github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-featuregate/logger"
 	"github.com/goliatone/go-featuregate/scope"
@@ -201,8 +201,8 @@ func (h *helperSet) featureIf(execCtx *pongo2.ExecutionContext, key any, whenTru
 	}
 	normalized, ok := parseKey(key)
 	if !ok {
-		return h.errorOrFallback("feature_if", featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "feature key is required", map[string]any{
-			featureerrors.MetaFeatureKey: key,
+		return h.errorOrFallback("feature_if", ferrors.WrapSentinel(ferrors.ErrInvalidKey, "feature key is required", map[string]any{
+			ferrors.MetaFeatureKey: key,
 		}), fallback)
 	}
 	value, err := h.resolveValue(execCtx, normalized)
@@ -222,8 +222,8 @@ func (h *helperSet) featureClass(execCtx *pongo2.ExecutionContext, key any, on a
 	}
 	normalized, ok := parseKey(key)
 	if !ok {
-		return h.errorOrFallback("feature_class", featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "feature key is required", map[string]any{
-			featureerrors.MetaFeatureKey: key,
+		return h.errorOrFallback("feature_class", ferrors.WrapSentinel(ferrors.ErrInvalidKey, "feature key is required", map[string]any{
+			ferrors.MetaFeatureKey: key,
 		}), fallback)
 	}
 	value, err := h.resolveValue(execCtx, normalized)
@@ -239,8 +239,8 @@ func (h *helperSet) featureClass(execCtx *pongo2.ExecutionContext, key any, on a
 func (h *helperSet) featureTrace(execCtx *pongo2.ExecutionContext, key any) any {
 	normalized, ok := parseKey(key)
 	if !ok {
-		return h.errorOrFallback("feature_trace", featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "feature key is required", map[string]any{
-			featureerrors.MetaFeatureKey: key,
+		return h.errorOrFallback("feature_trace", ferrors.WrapSentinel(ferrors.ErrInvalidKey, "feature key is required", map[string]any{
+			ferrors.MetaFeatureKey: key,
 		}), nil)
 	}
 	if snapshot := h.snapshot(execCtx); snapshot != nil {
@@ -263,8 +263,8 @@ func (h *helperSet) featureTrace(execCtx *pongo2.ExecutionContext, key any) any 
 
 func (h *helperSet) resolveValue(execCtx *pongo2.ExecutionContext, key string) (bool, error) {
 	if key == "" {
-		return false, featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "feature key is required", map[string]any{
-			featureerrors.MetaFeatureKey: key,
+		return false, ferrors.WrapSentinel(ferrors.ErrInvalidKey, "feature key is required", map[string]any{
+			ferrors.MetaFeatureKey: key,
 		})
 	}
 	if snapshot := h.snapshot(execCtx); snapshot != nil {
@@ -273,7 +273,7 @@ func (h *helperSet) resolveValue(execCtx *pongo2.ExecutionContext, key string) (
 		}
 	}
 	if h.gate == nil {
-		return false, featureerrors.WrapSentinel(featureerrors.ErrGateRequired, "feature gate is required", nil)
+		return false, ferrors.WrapSentinel(ferrors.ErrGateRequired, "feature gate is required", nil)
 	}
 	ctx := h.context(execCtx)
 	opts := h.resolveOptions(execCtx)
@@ -368,7 +368,7 @@ func templateError(helper string, err error) TemplateError {
 	if err == nil {
 		return out
 	}
-	if rich, ok := featureerrors.As(err); ok {
+	if rich, ok := ferrors.As(err); ok {
 		out.Message = rich.Message
 		out.Category = rich.Category.String()
 		out.TextCode = rich.TextCode
@@ -650,7 +650,7 @@ func (h *helperSet) logHelperError(helper string, err error) {
 		"helper", helper,
 		"error", err,
 	}
-	if rich, ok := featureerrors.As(err); ok {
+	if rich, ok := ferrors.As(err); ok {
 		args = append(args,
 			"category", rich.Category,
 			"text_code", rich.TextCode,

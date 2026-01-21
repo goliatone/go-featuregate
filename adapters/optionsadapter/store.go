@@ -8,7 +8,7 @@ import (
 	opts "github.com/goliatone/go-options"
 	"github.com/goliatone/go-options/pkg/state"
 
-	"github.com/goliatone/go-featuregate/featureerrors"
+	"github.com/goliatone/go-featuregate/ferrors"
 	"github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-featuregate/scope"
 	"github.com/goliatone/go-featuregate/store"
@@ -25,10 +25,10 @@ const (
 const DefaultDomain = "feature_flags"
 
 // ErrStoreRequired indicates the underlying state store is missing.
-var ErrStoreRequired = featureerrors.ErrStoreRequired
+var ErrStoreRequired = ferrors.ErrStoreRequired
 
 // ErrInvalidKey indicates a missing or invalid feature key.
-var ErrInvalidKey = featureerrors.ErrInvalidKey
+var ErrInvalidKey = ferrors.ErrInvalidKey
 
 // ScopeBuilder maps a ScopeSet into go-options scopes ordered by precedence.
 type ScopeBuilder func(scopeSet gate.ScopeSet) []opts.Scope
@@ -126,9 +126,9 @@ func (s *Store) Get(ctx context.Context, key string, scopeSet gate.ScopeSet) (st
 		snapshot, _, ok, err := s.stateStore.Load(ctx, state.Ref{Domain: s.domain, Scope: scopeDef})
 		if err != nil {
 			meta := storeMeta(scopeDef, "load", s.domain)
-			meta[featureerrors.MetaFeatureKey] = trimmed
-			meta[featureerrors.MetaFeatureKeyNormalized] = normalized
-			return store.MissingOverride(), featureerrors.WrapExternal(err, featureerrors.TextCodeStoreReadFailed, "optionsadapter: load failed", meta)
+			meta[ferrors.MetaFeatureKey] = trimmed
+			meta[ferrors.MetaFeatureKeyNormalized] = normalized
+			return store.MissingOverride(), ferrors.WrapExternal(err, ferrors.TextCodeStoreReadFailed, "optionsadapter: load failed", meta)
 		}
 		if !ok || len(snapshot) == 0 {
 			continue
@@ -164,7 +164,7 @@ func (s *Store) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, ena
 	resolver := state.Resolver[map[string]any]{Store: s.stateStore}
 	_, _, err = resolver.Mutate(ctx, ref, s.meta(actor), func(snapshot *map[string]any) error {
 		if snapshot == nil {
-			return featureerrors.WrapSentinel(featureerrors.ErrSnapshotRequired, "optionsadapter: snapshot is nil", storeMeta(ref.Scope, "set", s.domain))
+			return ferrors.WrapSentinel(ferrors.ErrSnapshotRequired, "optionsadapter: snapshot is nil", storeMeta(ref.Scope, "set", s.domain))
 		}
 		if *snapshot == nil {
 			*snapshot = map[string]any{}
@@ -173,9 +173,9 @@ func (s *Store) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, ena
 	})
 	if err != nil {
 		meta := storeMeta(ref.Scope, "set", s.domain)
-		meta[featureerrors.MetaFeatureKey] = trimmed
-		meta[featureerrors.MetaFeatureKeyNormalized] = normalized
-		return featureerrors.WrapExternal(err, featureerrors.TextCodeStoreWriteFailed, "optionsadapter: set failed", meta)
+		meta[ferrors.MetaFeatureKey] = trimmed
+		meta[ferrors.MetaFeatureKeyNormalized] = normalized
+		return ferrors.WrapExternal(err, ferrors.TextCodeStoreWriteFailed, "optionsadapter: set failed", meta)
 	}
 	return nil
 }
@@ -203,7 +203,7 @@ func (s *Store) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, a
 	resolver := state.Resolver[map[string]any]{Store: s.stateStore}
 	_, _, err = resolver.Mutate(ctx, ref, s.meta(actor), func(snapshot *map[string]any) error {
 		if snapshot == nil {
-			return featureerrors.WrapSentinel(featureerrors.ErrSnapshotRequired, "optionsadapter: snapshot is nil", storeMeta(ref.Scope, "unset", s.domain))
+			return ferrors.WrapSentinel(ferrors.ErrSnapshotRequired, "optionsadapter: snapshot is nil", storeMeta(ref.Scope, "unset", s.domain))
 		}
 		if *snapshot == nil {
 			*snapshot = map[string]any{}
@@ -213,9 +213,9 @@ func (s *Store) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, a
 	})
 	if err != nil {
 		meta := storeMeta(ref.Scope, "unset", s.domain)
-		meta[featureerrors.MetaFeatureKey] = trimmed
-		meta[featureerrors.MetaFeatureKeyNormalized] = normalized
-		return featureerrors.WrapExternal(err, featureerrors.TextCodeStoreWriteFailed, "optionsadapter: unset failed", meta)
+		meta[ferrors.MetaFeatureKey] = trimmed
+		meta[ferrors.MetaFeatureKeyNormalized] = normalized
+		return ferrors.WrapExternal(err, ferrors.TextCodeStoreWriteFailed, "optionsadapter: unset failed", meta)
 	}
 	return nil
 }
@@ -223,7 +223,7 @@ func (s *Store) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, a
 func (s *Store) writeRef(scopeSet gate.ScopeSet) (state.Ref, error) {
 	scopeDef := writeScope(scopeSet)
 	if scopeDef.Name == "" {
-		return state.Ref{}, featureerrors.WrapSentinel(featureerrors.ErrScopeRequired, "optionsadapter: scope is required", storeMeta(scopeDef, "write_ref", s.domain))
+		return state.Ref{}, ferrors.WrapSentinel(ferrors.ErrScopeRequired, "optionsadapter: scope is required", storeMeta(scopeDef, "write_ref", s.domain))
 	}
 	return state.Ref{Domain: s.domain, Scope: scopeDef}, nil
 }
@@ -305,8 +305,8 @@ func overrideFromValue(key string, value any, scopeDef opts.Scope, domain string
 		return store.DisabledOverride(), nil
 	default:
 		meta := storeMeta(scopeDef, "decode", domain)
-		meta[featureerrors.MetaFeatureKeyNormalized] = key
-		return store.MissingOverride(), featureerrors.NewExternal(featureerrors.TextCodeOverrideTypeInvalid, fmt.Sprintf("optionsadapter: unsupported override type %T", value), meta)
+		meta[ferrors.MetaFeatureKeyNormalized] = key
+		return store.MissingOverride(), ferrors.NewExternal(ferrors.TextCodeOverrideTypeInvalid, fmt.Sprintf("optionsadapter: unsupported override type %T", value), meta)
 	}
 }
 
@@ -315,39 +315,39 @@ var _ store.ReadWriter = (*Store)(nil)
 func storeRequiredError(key string, scopeSet gate.ScopeSet, operation, domain string) error {
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
-	return featureerrors.WrapSentinel(featureerrors.ErrStoreRequired, "optionsadapter: state store is required", map[string]any{
-		featureerrors.MetaAdapter:              "options",
-		featureerrors.MetaStore:                "state",
-		featureerrors.MetaDomain:               strings.TrimSpace(domain),
-		featureerrors.MetaScope:                scopeSet,
-		featureerrors.MetaOperation:            operation,
-		featureerrors.MetaFeatureKey:           trimmed,
-		featureerrors.MetaFeatureKeyNormalized: normalized,
+	return ferrors.WrapSentinel(ferrors.ErrStoreRequired, "optionsadapter: state store is required", map[string]any{
+		ferrors.MetaAdapter:              "options",
+		ferrors.MetaStore:                "state",
+		ferrors.MetaDomain:               strings.TrimSpace(domain),
+		ferrors.MetaScope:                scopeSet,
+		ferrors.MetaOperation:            operation,
+		ferrors.MetaFeatureKey:           trimmed,
+		ferrors.MetaFeatureKeyNormalized: normalized,
 	})
 }
 
 func invalidKeyError(key, normalized string, scopeSet gate.ScopeSet, operation, domain string) error {
 	meta := map[string]any{
-		featureerrors.MetaAdapter:              "options",
-		featureerrors.MetaStore:                "state",
-		featureerrors.MetaDomain:               strings.TrimSpace(domain),
-		featureerrors.MetaScope:                scopeSet,
-		featureerrors.MetaOperation:            operation,
-		featureerrors.MetaFeatureKey:           strings.TrimSpace(key),
-		featureerrors.MetaFeatureKeyNormalized: normalized,
+		ferrors.MetaAdapter:              "options",
+		ferrors.MetaStore:                "state",
+		ferrors.MetaDomain:               strings.TrimSpace(domain),
+		ferrors.MetaScope:                scopeSet,
+		ferrors.MetaOperation:            operation,
+		ferrors.MetaFeatureKey:           strings.TrimSpace(key),
+		ferrors.MetaFeatureKeyNormalized: normalized,
 	}
-	return featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "optionsadapter: feature key required", meta)
+	return ferrors.WrapSentinel(ferrors.ErrInvalidKey, "optionsadapter: feature key required", meta)
 }
 
 func storeMeta(scopeDef opts.Scope, operation, domain string) map[string]any {
 	meta := map[string]any{
-		featureerrors.MetaAdapter:   "options",
-		featureerrors.MetaStore:     "state",
-		featureerrors.MetaOperation: operation,
-		featureerrors.MetaScope:     scopeDef,
+		ferrors.MetaAdapter:   "options",
+		ferrors.MetaStore:     "state",
+		ferrors.MetaOperation: operation,
+		ferrors.MetaScope:     scopeDef,
 	}
 	if strings.TrimSpace(domain) != "" {
-		meta[featureerrors.MetaDomain] = strings.TrimSpace(domain)
+		meta[ferrors.MetaDomain] = strings.TrimSpace(domain)
 	}
 	return meta
 }

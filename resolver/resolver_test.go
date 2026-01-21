@@ -7,7 +7,7 @@ import (
 
 	goerrors "github.com/goliatone/go-errors"
 
-	"github.com/goliatone/go-featuregate/featureerrors"
+	"github.com/goliatone/go-featuregate/ferrors"
 	"github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-featuregate/store"
 )
@@ -125,13 +125,13 @@ func TestGateStrictStoreReturnsError(t *testing.T) {
 	if rich.Category != goerrors.CategoryExternal {
 		t.Fatalf("unexpected category: %s", rich.Category)
 	}
-	if rich.TextCode != featureerrors.TextCodeStoreReadFailed {
+	if rich.TextCode != ferrors.TextCodeStoreReadFailed {
 		t.Fatalf("unexpected text code: %s", rich.TextCode)
 	}
-	if rich.Metadata == nil || rich.Metadata[featureerrors.MetaStrict] != true {
+	if rich.Metadata == nil || rich.Metadata[ferrors.MetaStrict] != true {
 		t.Fatalf("expected strict metadata to be set")
 	}
-	if rich.Metadata[featureerrors.MetaFeatureKeyNormalized] != "users.signup" {
+	if rich.Metadata[ferrors.MetaFeatureKeyNormalized] != "users.signup" {
 		t.Fatalf("expected feature key metadata to be set")
 	}
 }

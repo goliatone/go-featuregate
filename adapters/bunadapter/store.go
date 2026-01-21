@@ -9,7 +9,7 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/goliatone/go-featuregate/featureerrors"
+	"github.com/goliatone/go-featuregate/ferrors"
 	"github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-featuregate/store"
 )
@@ -18,10 +18,10 @@ import (
 const DefaultTable = "feature_flags"
 
 // ErrDBRequired indicates the underlying Bun DB is missing.
-var ErrDBRequired = featureerrors.ErrStoreRequired
+var ErrDBRequired = ferrors.ErrStoreRequired
 
 // ErrInvalidKey indicates a missing or invalid feature key.
-var ErrInvalidKey = featureerrors.ErrInvalidKey
+var ErrInvalidKey = ferrors.ErrInvalidKey
 
 // Store adapts Bun DB operations to featuregate overrides.
 type Store struct {
@@ -123,14 +123,14 @@ func (s *Store) Get(ctx context.Context, key string, scopeSet gate.ScopeSet) (st
 			if errors.Is(err, sql.ErrNoRows) {
 				continue
 			}
-			return store.MissingOverride(), featureerrors.WrapExternal(err, featureerrors.TextCodeStoreReadFailed, "bunadapter: read failed", map[string]any{
-				featureerrors.MetaAdapter:              "bun",
-				featureerrors.MetaStore:                "bun",
-				featureerrors.MetaTable:                s.table,
-				featureerrors.MetaFeatureKey:           strings.TrimSpace(key),
-				featureerrors.MetaFeatureKeyNormalized: normalized,
-				featureerrors.MetaScope:                scopeSet,
-				featureerrors.MetaOperation:            "get",
+			return store.MissingOverride(), ferrors.WrapExternal(err, ferrors.TextCodeStoreReadFailed, "bunadapter: read failed", map[string]any{
+				ferrors.MetaAdapter:              "bun",
+				ferrors.MetaStore:                "bun",
+				ferrors.MetaTable:                s.table,
+				ferrors.MetaFeatureKey:           strings.TrimSpace(key),
+				ferrors.MetaFeatureKeyNormalized: normalized,
+				ferrors.MetaScope:                scopeSet,
+				ferrors.MetaOperation:            "get",
 			})
 		}
 		return overrideFromRecord(record), nil
@@ -183,14 +183,14 @@ func (s *Store) Delete(ctx context.Context, key string, scopeSet gate.ScopeSet) 
 	}
 	_, err = query.Exec(ctx)
 	if err != nil {
-		return featureerrors.WrapExternal(err, featureerrors.TextCodeStoreWriteFailed, "bunadapter: delete failed", map[string]any{
-			featureerrors.MetaAdapter:              "bun",
-			featureerrors.MetaStore:                "bun",
-			featureerrors.MetaTable:                s.table,
-			featureerrors.MetaFeatureKey:           strings.TrimSpace(key),
-			featureerrors.MetaFeatureKeyNormalized: normalized,
-			featureerrors.MetaScope:                scopeSet,
-			featureerrors.MetaOperation:            "delete",
+		return ferrors.WrapExternal(err, ferrors.TextCodeStoreWriteFailed, "bunadapter: delete failed", map[string]any{
+			ferrors.MetaAdapter:              "bun",
+			ferrors.MetaStore:                "bun",
+			ferrors.MetaTable:                s.table,
+			ferrors.MetaFeatureKey:           strings.TrimSpace(key),
+			ferrors.MetaFeatureKeyNormalized: normalized,
+			ferrors.MetaScope:                scopeSet,
+			ferrors.MetaOperation:            "delete",
 		})
 	}
 	return nil
@@ -215,14 +215,14 @@ func (s *Store) upsert(ctx context.Context, key string, scope scopeKey, enabled 
 	}
 	_, err := query.Exec(ctx)
 	if err != nil {
-		return featureerrors.WrapExternal(err, featureerrors.TextCodeStoreWriteFailed, "bunadapter: upsert failed", map[string]any{
-			featureerrors.MetaAdapter:              "bun",
-			featureerrors.MetaStore:                "bun",
-			featureerrors.MetaTable:                s.table,
-			featureerrors.MetaFeatureKey:           key,
-			featureerrors.MetaFeatureKeyNormalized: key,
-			featureerrors.MetaScope:                scope,
-			featureerrors.MetaOperation:            "upsert",
+		return ferrors.WrapExternal(err, ferrors.TextCodeStoreWriteFailed, "bunadapter: upsert failed", map[string]any{
+			ferrors.MetaAdapter:              "bun",
+			ferrors.MetaStore:                "bun",
+			ferrors.MetaTable:                s.table,
+			ferrors.MetaFeatureKey:           key,
+			ferrors.MetaFeatureKeyNormalized: key,
+			ferrors.MetaScope:                scope,
+			ferrors.MetaOperation:            "upsert",
 		})
 	}
 	return nil
@@ -245,11 +245,11 @@ func normalizeKey(key string) (string, error) {
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
 	if normalized == "" {
-		return "", featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "bunadapter: feature key required", map[string]any{
-			featureerrors.MetaFeatureKey:           trimmed,
-			featureerrors.MetaFeatureKeyNormalized: normalized,
-			featureerrors.MetaAdapter:              "bun",
-			featureerrors.MetaStore:                "bun",
+		return "", ferrors.WrapSentinel(ferrors.ErrInvalidKey, "bunadapter: feature key required", map[string]any{
+			ferrors.MetaFeatureKey:           trimmed,
+			ferrors.MetaFeatureKeyNormalized: normalized,
+			ferrors.MetaAdapter:              "bun",
+			ferrors.MetaStore:                "bun",
 		})
 	}
 	return normalized, nil
@@ -316,12 +316,12 @@ var _ store.ReadWriter = (*Store)(nil)
 func storeRequiredError(key string, scopeSet gate.ScopeSet, operation string) error {
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
-	return featureerrors.WrapSentinel(featureerrors.ErrStoreRequired, "bunadapter: db is required", map[string]any{
-		featureerrors.MetaAdapter:              "bun",
-		featureerrors.MetaStore:                "bun",
-		featureerrors.MetaFeatureKey:           trimmed,
-		featureerrors.MetaFeatureKeyNormalized: normalized,
-		featureerrors.MetaScope:                scopeSet,
-		featureerrors.MetaOperation:            operation,
+	return ferrors.WrapSentinel(ferrors.ErrStoreRequired, "bunadapter: db is required", map[string]any{
+		ferrors.MetaAdapter:              "bun",
+		ferrors.MetaStore:                "bun",
+		ferrors.MetaFeatureKey:           trimmed,
+		ferrors.MetaFeatureKeyNormalized: normalized,
+		ferrors.MetaScope:                scopeSet,
+		ferrors.MetaOperation:            operation,
 	})
 }

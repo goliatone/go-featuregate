@@ -5,15 +5,15 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/goliatone/go-featuregate/featureerrors"
+	"github.com/goliatone/go-featuregate/ferrors"
 	"github.com/goliatone/go-featuregate/gate"
 )
 
 // ErrMemoryStoreRequired signals a missing memory store.
-var ErrMemoryStoreRequired = featureerrors.ErrStoreRequired
+var ErrMemoryStoreRequired = ferrors.ErrStoreRequired
 
 // ErrInvalidKey signals a missing or invalid feature key.
-var ErrInvalidKey = featureerrors.ErrInvalidKey
+var ErrInvalidKey = ferrors.ErrInvalidKey
 
 // MemoryStore keeps overrides in memory for tests and examples.
 type MemoryStore struct {
@@ -154,10 +154,10 @@ func normalizeKey(key string) (string, error) {
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
 	if normalized == "" {
-		return "", featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "store: feature key required", map[string]any{
-			featureerrors.MetaFeatureKey:           trimmed,
-			featureerrors.MetaFeatureKeyNormalized: normalized,
-			featureerrors.MetaStore:                "memory",
+		return "", ferrors.WrapSentinel(ferrors.ErrInvalidKey, "store: feature key required", map[string]any{
+			ferrors.MetaFeatureKey:           trimmed,
+			ferrors.MetaFeatureKeyNormalized: normalized,
+			ferrors.MetaStore:                "memory",
 		})
 	}
 	return normalized, nil
@@ -196,11 +196,11 @@ var _ ReadWriter = (*MemoryStore)(nil)
 func storeRequiredError(key string, scopeSet gate.ScopeSet, operation string) error {
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
-	return featureerrors.WrapSentinel(featureerrors.ErrStoreRequired, "store: memory store is required", map[string]any{
-		featureerrors.MetaFeatureKey:           trimmed,
-		featureerrors.MetaFeatureKeyNormalized: normalized,
-		featureerrors.MetaScope:                scopeSet,
-		featureerrors.MetaStore:                "memory",
-		featureerrors.MetaOperation:            operation,
+	return ferrors.WrapSentinel(ferrors.ErrStoreRequired, "store: memory store is required", map[string]any{
+		ferrors.MetaFeatureKey:           trimmed,
+		ferrors.MetaFeatureKeyNormalized: normalized,
+		ferrors.MetaScope:                scopeSet,
+		ferrors.MetaStore:                "memory",
+		ferrors.MetaOperation:            operation,
 	})
 }

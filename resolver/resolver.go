@@ -6,17 +6,17 @@ import (
 
 	"github.com/goliatone/go-featuregate/activity"
 	"github.com/goliatone/go-featuregate/cache"
-	"github.com/goliatone/go-featuregate/featureerrors"
+	"github.com/goliatone/go-featuregate/ferrors"
 	"github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-featuregate/scope"
 	"github.com/goliatone/go-featuregate/store"
 )
 
 // ErrInvalidKey signals an empty or invalid feature key.
-var ErrInvalidKey = featureerrors.ErrInvalidKey
+var ErrInvalidKey = ferrors.ErrInvalidKey
 
 // ErrStoreUnavailable signals a missing runtime override store.
-var ErrStoreUnavailable = featureerrors.ErrStoreUnavailable
+var ErrStoreUnavailable = ferrors.ErrStoreUnavailable
 
 // DefaultResult captures a config default lookup.
 type DefaultResult struct {
@@ -172,29 +172,29 @@ func (g *Gate) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, enab
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
 	if g.writer == nil {
-		return featureerrors.WrapSentinel(featureerrors.ErrStoreUnavailable, "", map[string]any{
-			featureerrors.MetaFeatureKey:           trimmed,
-			featureerrors.MetaFeatureKeyNormalized: normalized,
-			featureerrors.MetaScope:                scopeSet,
-			featureerrors.MetaStore:                "override",
-			featureerrors.MetaOperation:            "set",
+		return ferrors.WrapSentinel(ferrors.ErrStoreUnavailable, "", map[string]any{
+			ferrors.MetaFeatureKey:           trimmed,
+			ferrors.MetaFeatureKeyNormalized: normalized,
+			ferrors.MetaScope:                scopeSet,
+			ferrors.MetaStore:                "override",
+			ferrors.MetaOperation:            "set",
 		})
 	}
 	if normalized == "" {
-		return featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "", map[string]any{
-			featureerrors.MetaFeatureKey:           trimmed,
-			featureerrors.MetaFeatureKeyNormalized: normalized,
-			featureerrors.MetaScope:                scopeSet,
-			featureerrors.MetaOperation:            "set",
+		return ferrors.WrapSentinel(ferrors.ErrInvalidKey, "", map[string]any{
+			ferrors.MetaFeatureKey:           trimmed,
+			ferrors.MetaFeatureKeyNormalized: normalized,
+			ferrors.MetaScope:                scopeSet,
+			ferrors.MetaOperation:            "set",
 		})
 	}
 	if err := g.writer.Set(ctx, normalized, scopeSet, enabled, actor); err != nil {
-		return featureerrors.WrapExternal(err, featureerrors.TextCodeStoreWriteFailed, "override store set failed", map[string]any{
-			featureerrors.MetaFeatureKey:           trimmed,
-			featureerrors.MetaFeatureKeyNormalized: normalized,
-			featureerrors.MetaScope:                scopeSet,
-			featureerrors.MetaStore:                "override",
-			featureerrors.MetaOperation:            "set",
+		return ferrors.WrapExternal(err, ferrors.TextCodeStoreWriteFailed, "override store set failed", map[string]any{
+			ferrors.MetaFeatureKey:           trimmed,
+			ferrors.MetaFeatureKeyNormalized: normalized,
+			ferrors.MetaScope:                scopeSet,
+			ferrors.MetaStore:                "override",
+			ferrors.MetaOperation:            "set",
 		})
 	}
 	if g.cache != nil {
@@ -216,29 +216,29 @@ func (g *Gate) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, ac
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
 	if g.writer == nil {
-		return featureerrors.WrapSentinel(featureerrors.ErrStoreUnavailable, "", map[string]any{
-			featureerrors.MetaFeatureKey:           trimmed,
-			featureerrors.MetaFeatureKeyNormalized: normalized,
-			featureerrors.MetaScope:                scopeSet,
-			featureerrors.MetaStore:                "override",
-			featureerrors.MetaOperation:            "unset",
+		return ferrors.WrapSentinel(ferrors.ErrStoreUnavailable, "", map[string]any{
+			ferrors.MetaFeatureKey:           trimmed,
+			ferrors.MetaFeatureKeyNormalized: normalized,
+			ferrors.MetaScope:                scopeSet,
+			ferrors.MetaStore:                "override",
+			ferrors.MetaOperation:            "unset",
 		})
 	}
 	if normalized == "" {
-		return featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "", map[string]any{
-			featureerrors.MetaFeatureKey:           trimmed,
-			featureerrors.MetaFeatureKeyNormalized: normalized,
-			featureerrors.MetaScope:                scopeSet,
-			featureerrors.MetaOperation:            "unset",
+		return ferrors.WrapSentinel(ferrors.ErrInvalidKey, "", map[string]any{
+			ferrors.MetaFeatureKey:           trimmed,
+			ferrors.MetaFeatureKeyNormalized: normalized,
+			ferrors.MetaScope:                scopeSet,
+			ferrors.MetaOperation:            "unset",
 		})
 	}
 	if err := g.writer.Unset(ctx, normalized, scopeSet, actor); err != nil {
-		return featureerrors.WrapExternal(err, featureerrors.TextCodeStoreWriteFailed, "override store unset failed", map[string]any{
-			featureerrors.MetaFeatureKey:           trimmed,
-			featureerrors.MetaFeatureKeyNormalized: normalized,
-			featureerrors.MetaScope:                scopeSet,
-			featureerrors.MetaStore:                "override",
-			featureerrors.MetaOperation:            "unset",
+		return ferrors.WrapExternal(err, ferrors.TextCodeStoreWriteFailed, "override store unset failed", map[string]any{
+			ferrors.MetaFeatureKey:           trimmed,
+			ferrors.MetaFeatureKeyNormalized: normalized,
+			ferrors.MetaScope:                scopeSet,
+			ferrors.MetaStore:                "override",
+			ferrors.MetaOperation:            "unset",
 		})
 	}
 	aliasErr := g.unsetAliases(ctx, normalized, scopeSet, actor)
@@ -267,10 +267,10 @@ func (g *Gate) resolve(ctx context.Context, key string, opts ...gate.ResolveOpti
 		NormalizedKey: normalized,
 	}
 	if normalized == "" {
-		err := featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "", map[string]any{
-			featureerrors.MetaFeatureKey:           trimmed,
-			featureerrors.MetaFeatureKeyNormalized: normalized,
-			featureerrors.MetaOperation:            "resolve",
+		err := ferrors.WrapSentinel(ferrors.ErrInvalidKey, "", map[string]any{
+			ferrors.MetaFeatureKey:           trimmed,
+			ferrors.MetaFeatureKeyNormalized: normalized,
+			ferrors.MetaOperation:            "resolve",
 		})
 		trace.Source = gate.ResolveSourceFallback
 		g.emitResolve(ctx, trace, err)
@@ -279,10 +279,10 @@ func (g *Gate) resolve(ctx context.Context, key string, opts ...gate.ResolveOpti
 
 	scopeSet, err := g.resolveScope(ctx, opts...)
 	if err != nil {
-		err = featureerrors.WrapExternal(err, featureerrors.TextCodeScopeResolveFailed, "scope resolution failed", map[string]any{
-			featureerrors.MetaFeatureKey:           trimmed,
-			featureerrors.MetaFeatureKeyNormalized: normalized,
-			featureerrors.MetaOperation:            "resolve_scope",
+		err = ferrors.WrapExternal(err, ferrors.TextCodeScopeResolveFailed, "scope resolution failed", map[string]any{
+			ferrors.MetaFeatureKey:           trimmed,
+			ferrors.MetaFeatureKeyNormalized: normalized,
+			ferrors.MetaOperation:            "resolve_scope",
 		})
 		trace.Scope = scopeSet
 		trace.Source = gate.ResolveSourceFallback
@@ -312,13 +312,13 @@ func (g *Gate) resolve(ctx context.Context, key string, opts ...gate.ResolveOpti
 	if g.overrides != nil {
 		override, err := g.overrides.Get(ctx, normalized, scopeSet)
 		if err != nil {
-			storeErr = featureerrors.WrapExternal(err, featureerrors.TextCodeStoreReadFailed, "override store read failed", map[string]any{
-				featureerrors.MetaFeatureKey:           trimmed,
-				featureerrors.MetaFeatureKeyNormalized: normalized,
-				featureerrors.MetaScope:                scopeSet,
-				featureerrors.MetaStore:                "override",
-				featureerrors.MetaOperation:            "get",
-				featureerrors.MetaStrict:               g.strictStore,
+			storeErr = ferrors.WrapExternal(err, ferrors.TextCodeStoreReadFailed, "override store read failed", map[string]any{
+				ferrors.MetaFeatureKey:           trimmed,
+				ferrors.MetaFeatureKeyNormalized: normalized,
+				ferrors.MetaScope:                scopeSet,
+				ferrors.MetaStore:                "override",
+				ferrors.MetaOperation:            "get",
+				ferrors.MetaStrict:               g.strictStore,
 			})
 			trace.Override.Error = storeErr
 			if g.strictStore {
@@ -332,13 +332,13 @@ func (g *Gate) resolve(ctx context.Context, key string, opts ...gate.ResolveOpti
 			if override.State == gate.OverrideStateMissing {
 				aliasOverride, aliasErr := g.aliasOverride(ctx, normalized, scopeSet)
 				if aliasErr != nil {
-					storeErr = featureerrors.WrapExternal(aliasErr, featureerrors.TextCodeStoreReadFailed, "override store read failed", map[string]any{
-						featureerrors.MetaFeatureKey:           trimmed,
-						featureerrors.MetaFeatureKeyNormalized: normalized,
-						featureerrors.MetaScope:                scopeSet,
-						featureerrors.MetaStore:                "override",
-						featureerrors.MetaOperation:            "get_alias",
-						featureerrors.MetaStrict:               g.strictStore,
+					storeErr = ferrors.WrapExternal(aliasErr, ferrors.TextCodeStoreReadFailed, "override store read failed", map[string]any{
+						ferrors.MetaFeatureKey:           trimmed,
+						ferrors.MetaFeatureKeyNormalized: normalized,
+						ferrors.MetaScope:                scopeSet,
+						ferrors.MetaStore:                "override",
+						ferrors.MetaOperation:            "get_alias",
+						ferrors.MetaStrict:               g.strictStore,
 					})
 					trace.Override.Error = storeErr
 					if g.strictStore {
@@ -372,11 +372,11 @@ func (g *Gate) resolve(ctx context.Context, key string, opts ...gate.ResolveOpti
 	}
 	def, err := defaults.Default(ctx, normalized)
 	if err != nil {
-		err = featureerrors.WrapExternal(err, featureerrors.TextCodeDefaultLookupFailed, "default lookup failed", map[string]any{
-			featureerrors.MetaFeatureKey:           trimmed,
-			featureerrors.MetaFeatureKeyNormalized: normalized,
-			featureerrors.MetaScope:                scopeSet,
-			featureerrors.MetaOperation:            "default",
+		err = ferrors.WrapExternal(err, ferrors.TextCodeDefaultLookupFailed, "default lookup failed", map[string]any{
+			ferrors.MetaFeatureKey:           trimmed,
+			ferrors.MetaFeatureKeyNormalized: normalized,
+			ferrors.MetaScope:                scopeSet,
+			ferrors.MetaOperation:            "default",
 		})
 		trace.Default.Error = err
 		trace.Source = gate.ResolveSourceFallback

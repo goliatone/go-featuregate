@@ -1,13 +1,13 @@
 package urlkitadapter
 
 import (
-	"github.com/goliatone/go-featuregate/featureerrors"
+	"github.com/goliatone/go-featuregate/ferrors"
 	"github.com/goliatone/go-featuregate/urlbuilder"
 	"github.com/goliatone/go-urlkit"
 )
 
 // ErrResolverRequired indicates the urlkit resolver is missing.
-var ErrResolverRequired = featureerrors.ErrResolverRequired
+var ErrResolverRequired = ferrors.ErrResolverRequired
 
 // Adapter wraps a urlkit.Resolver to satisfy urlbuilder.Builder.
 type Adapter struct {
@@ -22,16 +22,16 @@ func New(resolver urlkit.Resolver) Adapter {
 // Resolve implements urlbuilder.Builder.
 func (a Adapter) Resolve(groupPath, route string, params map[string]any, query map[string]string) (string, error) {
 	if a.Resolver == nil {
-		return "", featureerrors.WrapSentinel(featureerrors.ErrResolverRequired, "urlkitadapter: resolver is required", map[string]any{
-			featureerrors.MetaAdapter:   "urlkit",
-			featureerrors.MetaOperation: "resolve",
+		return "", ferrors.WrapSentinel(ferrors.ErrResolverRequired, "urlkitadapter: resolver is required", map[string]any{
+			ferrors.MetaAdapter:   "urlkit",
+			ferrors.MetaOperation: "resolve",
 		})
 	}
 	url, err := a.Resolver.Resolve(groupPath, route, params, query)
 	if err != nil {
-		return "", featureerrors.WrapExternal(err, featureerrors.TextCodeAdapterFailed, "urlkitadapter: resolve failed", map[string]any{
-			featureerrors.MetaAdapter:   "urlkit",
-			featureerrors.MetaOperation: "resolve",
+		return "", ferrors.WrapExternal(err, ferrors.TextCodeAdapterFailed, "urlkitadapter: resolve failed", map[string]any{
+			ferrors.MetaAdapter:   "urlkit",
+			ferrors.MetaOperation: "resolve",
 		})
 	}
 	return url, nil

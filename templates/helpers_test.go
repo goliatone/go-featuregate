@@ -9,7 +9,7 @@ import (
 
 	goerrors "github.com/goliatone/go-errors"
 
-	"github.com/goliatone/go-featuregate/featureerrors"
+	"github.com/goliatone/go-featuregate/ferrors"
 	"github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-featuregate/logger"
 )
@@ -155,7 +155,7 @@ func TestTemplateHelpersErrorLoggingUsesArgs(t *testing.T) {
 	if !hasArgPair(logStub.args, "helper", "feature_if") {
 		t.Fatalf("expected helper arg pair to be logged")
 	}
-	if !hasArgPair(logStub.args, "text_code", featureerrors.TextCodeInvalidKey) {
+	if !hasArgPair(logStub.args, "text_code", ferrors.TextCodeInvalidKey) {
 		t.Fatalf("expected text_code arg pair to be logged")
 	}
 	if !hasArgPair(logStub.args, "category", goerrors.CategoryBadInput) {

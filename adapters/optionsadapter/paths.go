@@ -3,7 +3,7 @@ package optionsadapter
 import (
 	"strings"
 
-	"github.com/goliatone/go-featuregate/featureerrors"
+	"github.com/goliatone/go-featuregate/ferrors"
 )
 
 func splitPath(path string) []string {
@@ -52,8 +52,8 @@ func lookupPath(snapshot map[string]any, path string) (any, bool) {
 func setPath(snapshot map[string]any, path string, value any) error {
 	segments := splitPath(path)
 	if len(segments) == 0 {
-		return featureerrors.WrapSentinel(featureerrors.ErrPathRequired, "optionsadapter: path is empty", map[string]any{
-			featureerrors.MetaPath: path,
+		return ferrors.WrapSentinel(ferrors.ErrPathRequired, "optionsadapter: path is empty", map[string]any{
+			ferrors.MetaPath: path,
 		})
 	}
 	current := snapshot
@@ -67,8 +67,8 @@ func setPath(snapshot map[string]any, path string, value any) error {
 		}
 		child, ok := next.(map[string]any)
 		if !ok {
-			return featureerrors.WrapSentinel(featureerrors.ErrPathInvalid, "optionsadapter: path segment is not a map", map[string]any{
-				featureerrors.MetaPath: segment,
+			return ferrors.WrapSentinel(ferrors.ErrPathInvalid, "optionsadapter: path segment is not a map", map[string]any{
+				ferrors.MetaPath: segment,
 			})
 		}
 		current = child
