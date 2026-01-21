@@ -205,6 +205,7 @@ func (g *Gate) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, ac
 	if err := g.writer.Unset(ctx, normalized, scopeSet, actor); err != nil {
 		return err
 	}
+	aliasErr := g.unsetAliases(ctx, normalized, scopeSet, actor)
 	if g.cache != nil {
 		g.cache.Delete(ctx, normalized, scopeSet)
 	}
@@ -216,6 +217,9 @@ func (g *Gate) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, ac
 		Action:        activity.ActionUnset,
 		Value:         nil,
 	})
+	if aliasErr != nil {
+		return aliasErr
+	}
 	return nil
 }
 
@@ -271,8 +275,21 @@ func (g *Gate) resolve(ctx context.Context, key string, opts ...gate.ResolveOpti
 				return false, trace, err
 			}
 		} else {
-			if override.State == "" {
-				override.State = gate.OverrideStateMissing
+			override = normalizeOverride(override)
+			if override.State == gate.OverrideStateMissing {
+				aliasOverride, aliasErr := g.aliasOverride(ctx, normalized, scopeSet)
+				if aliasErr != nil {
+					storeErr = aliasErr
+					trace.Override.Error = aliasErr
+					if g.strictStore {
+						trace.Override.State = gate.OverrideStateMissing
+						trace.Source = gate.ResolveSourceFallback
+						g.emitResolve(ctx, trace, aliasErr)
+						return false, trace, aliasErr
+					}
+				} else {
+					override = aliasOverride
+				}
 			}
 			trace.Override.State = override.State
 			if override.HasValue() {
@@ -379,4 +396,48 @@ func (g *Gate) emitUpdate(ctx context.Context, event activity.UpdateEvent) {
 
 func boolPtr(value bool) *bool {
 	return &value
+}
+
+func normalizeOverride(override store.Override) store.Override {
+	if override.State == "" {
+		override.State = gate.OverrideStateMissing
+	}
+	return override
+}
+
+func (g *Gate) aliasOverride(ctx context.Context, key string, scopeSet gate.ScopeSet) (store.Override, error) {
+	if g == nil || g.overrides == nil {
+		return store.MissingOverride(), nil
+	}
+	aliases := gate.AliasesFor(key)
+	if len(aliases) == 0 {
+		return store.MissingOverride(), nil
+	}
+	for _, alias := range aliases {
+		override, err := g.overrides.Get(ctx, alias, scopeSet)
+		if err != nil {
+			return store.MissingOverride(), err
+		}
+		override = normalizeOverride(override)
+		if override.State != gate.OverrideStateMissing {
+			return override, nil
+		}
+	}
+	return store.MissingOverride(), nil
+}
+
+func (g *Gate) unsetAliases(ctx context.Context, normalized string, scopeSet gate.ScopeSet, actor gate.ActorRef) error {
+	if g == nil || g.writer == nil {
+		return nil
+	}
+	aliases := gate.AliasesFor(normalized)
+	if len(aliases) == 0 {
+		return nil
+	}
+	for _, alias := range aliases {
+		if err := g.writer.Unset(ctx, alias, scopeSet, actor); err != nil {
+			return err
+		}
+	}
+	return nil
 }
