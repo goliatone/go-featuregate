@@ -15,6 +15,12 @@ const (
 	userIDKey   contextKey = "featuregate.user_id"
 )
 
+const (
+	MetadataTenantID = "tenant_id"
+	MetadataOrgID    = "org_id"
+	MetadataUserID   = "user_id"
+)
+
 // WithTenantID stores a tenant identifier in context.
 func WithTenantID(ctx context.Context, tenantID string) context.Context {
 	return context.WithValue(ctx, tenantIDKey, strings.TrimSpace(tenantID))
