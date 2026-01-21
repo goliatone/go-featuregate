@@ -9,6 +9,7 @@ require (
 	github.com/goliatone/go-admin v0.19.0
 	github.com/goliatone/go-auth v0.25.0
 	github.com/goliatone/go-config v0.8.0
+	github.com/goliatone/go-errors v0.10.0
 	github.com/goliatone/go-logger v0.6.0
 	github.com/goliatone/go-options v0.7.0
 	github.com/goliatone/go-router v0.42.0
@@ -62,7 +63,6 @@ require (
 	github.com/goliatone/go-composite-fs v0.3.0 // indirect
 	github.com/goliatone/go-crud v0.17.0 // indirect
 	github.com/goliatone/go-dashboard v0.6.0 // indirect
-	github.com/goliatone/go-errors v0.10.0 // indirect
 	github.com/goliatone/go-i18n v0.2.0 // indirect
 	github.com/goliatone/go-job v0.14.0 // indirect
 	github.com/goliatone/go-masker v0.1.0 // indirect
