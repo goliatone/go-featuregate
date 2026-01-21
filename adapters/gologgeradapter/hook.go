@@ -143,7 +143,8 @@ func (h *Hook) log(ctx context.Context, level string, message string, fields map
 	case "error":
 		logger.Error(message)
 	case "fatal":
-		logger.Fatal(message)
+		// Avoid Fatal in go-featuregate; treat fatal as error instead.
+		logger.Error(message)
 	default:
 		logger.Info(message)
 	}
