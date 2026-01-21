@@ -103,7 +103,7 @@ type FeatureFlagRecord struct {
 // Get implements store.Reader.
 func (s *Store) Get(ctx context.Context, key string, scopeSet gate.ScopeSet) (store.Override, error) {
 	if s == nil || s.db == nil {
-		return store.MissingOverride(), storeRequiredError(scopeSet, "get")
+		return store.MissingOverride(), storeRequiredError(key, scopeSet, "get")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
@@ -141,7 +141,7 @@ func (s *Store) Get(ctx context.Context, key string, scopeSet gate.ScopeSet) (st
 // Set implements store.Writer.
 func (s *Store) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, enabled bool, actor gate.ActorRef) error {
 	if s == nil || s.db == nil {
-		return storeRequiredError(scopeSet, "set")
+		return storeRequiredError(key, scopeSet, "set")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
@@ -154,7 +154,7 @@ func (s *Store) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, ena
 // Unset implements store.Writer.
 func (s *Store) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, actor gate.ActorRef) error {
 	if s == nil || s.db == nil {
-		return storeRequiredError(scopeSet, "unset")
+		return storeRequiredError(key, scopeSet, "unset")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
@@ -167,7 +167,7 @@ func (s *Store) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, a
 // Delete removes a stored override row.
 func (s *Store) Delete(ctx context.Context, key string, scopeSet gate.ScopeSet) error {
 	if s == nil || s.db == nil {
-		return storeRequiredError(scopeSet, "delete")
+		return storeRequiredError(key, scopeSet, "delete")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
@@ -313,11 +313,15 @@ func overrideFromRecord(record FeatureFlagRecord) store.Override {
 
 var _ store.ReadWriter = (*Store)(nil)
 
-func storeRequiredError(scopeSet gate.ScopeSet, operation string) error {
+func storeRequiredError(key string, scopeSet gate.ScopeSet, operation string) error {
+	trimmed := strings.TrimSpace(key)
+	normalized := gate.NormalizeKey(trimmed)
 	return featureerrors.WrapSentinel(featureerrors.ErrStoreRequired, "bunadapter: db is required", map[string]any{
-		featureerrors.MetaAdapter:   "bun",
-		featureerrors.MetaStore:     "bun",
-		featureerrors.MetaScope:     scopeSet,
-		featureerrors.MetaOperation: operation,
+		featureerrors.MetaAdapter:              "bun",
+		featureerrors.MetaStore:                "bun",
+		featureerrors.MetaFeatureKey:           trimmed,
+		featureerrors.MetaFeatureKeyNormalized: normalized,
+		featureerrors.MetaScope:                scopeSet,
+		featureerrors.MetaOperation:            operation,
 	})
 }
