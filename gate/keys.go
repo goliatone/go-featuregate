@@ -1,6 +1,9 @@
 package gate
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 const (
 	FeatureUsersSignup           = "users.signup"
@@ -36,4 +39,23 @@ func ResolveAlias(key string) (string, bool) {
 func IsAlias(key string) bool {
 	_, ok := keyAliases[strings.TrimSpace(key)]
 	return ok
+}
+
+// AliasesFor returns the legacy alias keys for the provided key.
+func AliasesFor(key string) []string {
+	normalized := NormalizeKey(key)
+	if normalized == "" {
+		return nil
+	}
+	aliases := make([]string, 0, len(keyAliases))
+	for alias, canonical := range keyAliases {
+		if canonical == normalized {
+			aliases = append(aliases, alias)
+		}
+	}
+	if len(aliases) == 0 {
+		return nil
+	}
+	sort.Strings(aliases)
+	return aliases
 }
