@@ -91,12 +91,12 @@ func WithUpdatedByBuilder(builder func(gate.ActorRef) string) Option {
 // FeatureFlagRecord maps to the feature_flags table.
 type FeatureFlagRecord struct {
 	bun.BaseModel `bun:"table:feature_flags"`
-	Key          string    `bun:"key,pk"`
-	ScopeType    string    `bun:"scope_type,pk"`
-	ScopeID      string    `bun:"scope_id,pk"`
-	Enabled      *bool     `bun:"enabled,nullzero"`
-	UpdatedBy    string    `bun:"updated_by,nullzero"`
-	UpdatedAt    time.Time `bun:"updated_at,nullzero"`
+	Key           string    `bun:"key,pk"`
+	ScopeType     string    `bun:"scope_type,pk"`
+	ScopeID       string    `bun:"scope_id,pk"`
+	Enabled       *bool     `bun:"enabled,nullzero"`
+	UpdatedBy     string    `bun:"updated_by,nullzero"`
+	UpdatedAt     time.Time `bun:"updated_at,nullzero"`
 }
 
 // Get implements store.Reader.
