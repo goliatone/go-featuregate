@@ -8,6 +8,7 @@ import (
 	"github.com/flosch/pongo2/v6"
 
 	"github.com/goliatone/go-featuregate/gate"
+	"github.com/goliatone/go-featuregate/logger"
 	"github.com/goliatone/go-featuregate/scope"
 )
 
@@ -24,6 +25,7 @@ type HelperConfig struct {
 	SnapshotKey            string
 	EnableStructuredErrors bool
 	EnableErrorLogging     bool
+	Logger                 logger.Logger
 }
 
 // HelperOption configures template helpers.
@@ -90,6 +92,16 @@ func WithErrorLogging(enabled bool) HelperOption {
 	}
 }
 
+// WithLogger injects a logger for helper error logging.
+func WithLogger(lgr logger.Logger) HelperOption {
+	return func(cfg *HelperConfig) {
+		if cfg == nil {
+			return
+		}
+		cfg.Logger = lgr
+	}
+}
+
 // TemplateHelpers returns a helper set suitable for WithTemplateFunc.
 func TemplateHelpers(featureGate gate.FeatureGate, opts ...HelperOption) map[string]any {
 	cfg := DefaultHelperConfig()
@@ -97,6 +109,9 @@ func TemplateHelpers(featureGate gate.FeatureGate, opts ...HelperOption) map[str
 		if opt != nil {
 			opt(&cfg)
 		}
+	}
+	if cfg.EnableErrorLogging && cfg.Logger == nil {
+		cfg.Logger = logger.Default()
 	}
 	helpers := &helperSet{
 		gate:  featureGate,
@@ -330,7 +345,7 @@ func (h *helperSet) snapshot(execCtx *pongo2.ExecutionContext) any {
 func (h *helperSet) errorOrFallback(helper, errType, message string, context map[string]any, fallback any) any {
 	if h.cfg.EnableStructuredErrors {
 		if h.cfg.EnableErrorLogging {
-			logHelperError(helper, message, context)
+			h.logHelperError(helper, errType, message, context)
 		}
 		return TemplateError{
 			Helper:  helper,
@@ -340,7 +355,7 @@ func (h *helperSet) errorOrFallback(helper, errType, message string, context map
 		}
 	}
 	if h.cfg.EnableErrorLogging {
-		logHelperError(helper, message, context)
+		h.logHelperError(helper, errType, message, context)
 	}
 	return fallback
 }
@@ -506,8 +521,6 @@ func flattenKeys(value any) []any {
 		return out
 	case []any:
 		return typed
-	case []interface{}:
-		return typed
 	default:
 		return []any{value}
 	}
@@ -609,8 +622,16 @@ func splitPath(path string) []string {
 	return out
 }
 
-func logHelperError(helper, message string, context map[string]any) {
-	fmt.Printf("[featuregate helper error] %s: %s (context: %+v)\n", helper, message, context)
+func (h *helperSet) logHelperError(helper, errType, message string, context map[string]any) {
+	if h == nil || h.cfg.Logger == nil {
+		return
+	}
+	h.cfg.Logger.Error("featuregate.helper_error",
+		"helper", helper,
+		"type", errType,
+		"error", message,
+		"context", context,
+	)
 }
 
 func traceGate(featureGate gate.FeatureGate) gate.TraceableFeatureGate {
