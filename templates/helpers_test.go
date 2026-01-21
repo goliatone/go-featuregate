@@ -7,6 +7,9 @@ import (
 
 	"github.com/flosch/pongo2/v6"
 
+	goerrors "github.com/goliatone/go-errors"
+
+	"github.com/goliatone/go-featuregate/featureerrors"
 	"github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-featuregate/logger"
 )
@@ -152,8 +155,11 @@ func TestTemplateHelpersErrorLoggingUsesArgs(t *testing.T) {
 	if !hasArgPair(logStub.args, "helper", "feature_if") {
 		t.Fatalf("expected helper arg pair to be logged")
 	}
-	if !hasArgPair(logStub.args, "type", "invalid_key") {
-		t.Fatalf("expected type arg pair to be logged")
+	if !hasArgPair(logStub.args, "text_code", featureerrors.TextCodeInvalidKey) {
+		t.Fatalf("expected text_code arg pair to be logged")
+	}
+	if !hasArgPair(logStub.args, "category", goerrors.CategoryBadInput) {
+		t.Fatalf("expected category arg pair to be logged")
 	}
 }
 
