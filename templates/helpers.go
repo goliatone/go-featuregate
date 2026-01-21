@@ -7,6 +7,7 @@ import (
 
 	"github.com/flosch/pongo2/v6"
 
+	"github.com/goliatone/go-featuregate/featureerrors"
 	"github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-featuregate/logger"
 	"github.com/goliatone/go-featuregate/scope"
@@ -200,15 +201,13 @@ func (h *helperSet) featureIf(execCtx *pongo2.ExecutionContext, key any, whenTru
 	}
 	normalized, ok := parseKey(key)
 	if !ok {
-		return h.errorOrFallback("feature_if", "invalid_key", "feature key is required", map[string]any{
-			"key": key,
-		}, fallback)
+		return h.errorOrFallback("feature_if", featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "feature key is required", map[string]any{
+			featureerrors.MetaFeatureKey: key,
+		}), fallback)
 	}
 	value, err := h.resolveValue(execCtx, normalized)
 	if err != nil {
-		return h.errorOrFallback("feature_if", "resolve_error", err.Error(), map[string]any{
-			"key": normalized,
-		}, fallback)
+		return h.errorOrFallback("feature_if", err, fallback)
 	}
 	if value {
 		return whenTrue
@@ -223,15 +222,13 @@ func (h *helperSet) featureClass(execCtx *pongo2.ExecutionContext, key any, on a
 	}
 	normalized, ok := parseKey(key)
 	if !ok {
-		return h.errorOrFallback("feature_class", "invalid_key", "feature key is required", map[string]any{
-			"key": key,
-		}, fallback)
+		return h.errorOrFallback("feature_class", featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "feature key is required", map[string]any{
+			featureerrors.MetaFeatureKey: key,
+		}), fallback)
 	}
 	value, err := h.resolveValue(execCtx, normalized)
 	if err != nil {
-		return h.errorOrFallback("feature_class", "resolve_error", err.Error(), map[string]any{
-			"key": normalized,
-		}, fallback)
+		return h.errorOrFallback("feature_class", err, fallback)
 	}
 	if value {
 		return on
@@ -242,9 +239,9 @@ func (h *helperSet) featureClass(execCtx *pongo2.ExecutionContext, key any, on a
 func (h *helperSet) featureTrace(execCtx *pongo2.ExecutionContext, key any) any {
 	normalized, ok := parseKey(key)
 	if !ok {
-		return h.errorOrFallback("feature_trace", "invalid_key", "feature key is required", map[string]any{
-			"key": key,
-		}, nil)
+		return h.errorOrFallback("feature_trace", featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "feature key is required", map[string]any{
+			featureerrors.MetaFeatureKey: key,
+		}), nil)
 	}
 	if snapshot := h.snapshot(execCtx); snapshot != nil {
 		if trace, ok := snapshotTrace(snapshot, normalized); ok {
@@ -259,16 +256,16 @@ func (h *helperSet) featureTrace(execCtx *pongo2.ExecutionContext, key any) any 
 	opts := h.resolveOptions(execCtx)
 	_, trace, err := h.trace.ResolveWithTrace(ctx, normalized, opts...)
 	if err != nil {
-		return h.errorOrFallback("feature_trace", "resolve_error", err.Error(), map[string]any{
-			"key": normalized,
-		}, nil)
+		return h.errorOrFallback("feature_trace", err, nil)
 	}
 	return trace
 }
 
 func (h *helperSet) resolveValue(execCtx *pongo2.ExecutionContext, key string) (bool, error) {
 	if key == "" {
-		return false, fmt.Errorf("feature key is required")
+		return false, featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "feature key is required", map[string]any{
+			featureerrors.MetaFeatureKey: key,
+		})
 	}
 	if snapshot := h.snapshot(execCtx); snapshot != nil {
 		if value, ok := snapshotValue(snapshot, key); ok {
@@ -276,7 +273,7 @@ func (h *helperSet) resolveValue(execCtx *pongo2.ExecutionContext, key string) (
 		}
 	}
 	if h.gate == nil {
-		return false, fmt.Errorf("feature gate is required")
+		return false, featureerrors.WrapSentinel(featureerrors.ErrGateRequired, "feature gate is required", nil)
 	}
 	ctx := h.context(execCtx)
 	opts := h.resolveOptions(execCtx)
@@ -342,30 +339,53 @@ func (h *helperSet) snapshot(execCtx *pongo2.ExecutionContext) any {
 	return raw
 }
 
-func (h *helperSet) errorOrFallback(helper, errType, message string, context map[string]any, fallback any) any {
+func (h *helperSet) errorOrFallback(helper string, err error, fallback any) any {
 	if h.cfg.EnableStructuredErrors {
 		if h.cfg.EnableErrorLogging {
-			h.logHelperError(helper, errType, message, context)
+			h.logHelperError(helper, err)
 		}
-		return TemplateError{
-			Helper:  helper,
-			Type:    errType,
-			Message: message,
-			Context: context,
-		}
+		return templateError(helper, err)
 	}
 	if h.cfg.EnableErrorLogging {
-		h.logHelperError(helper, errType, message, context)
+		h.logHelperError(helper, err)
 	}
 	return fallback
 }
 
 // TemplateError provides structured helper error output.
 type TemplateError struct {
-	Helper  string         `json:"helper"`
-	Type    string         `json:"type"`
-	Message string         `json:"message"`
-	Context map[string]any `json:"context,omitempty"`
+	Helper   string         `json:"helper"`
+	Type     string         `json:"type,omitempty"`
+	Message  string         `json:"message,omitempty"`
+	Category string         `json:"category,omitempty"`
+	TextCode string         `json:"text_code,omitempty"`
+	Context  map[string]any `json:"context,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+func templateError(helper string, err error) TemplateError {
+	out := TemplateError{Helper: helper}
+	if err == nil {
+		return out
+	}
+	if rich, ok := featureerrors.As(err); ok {
+		out.Message = rich.Message
+		out.Category = rich.Category.String()
+		out.TextCode = rich.TextCode
+		if len(rich.Metadata) > 0 {
+			out.Metadata = rich.Metadata
+			out.Context = rich.Metadata
+		}
+		if out.TextCode != "" {
+			out.Type = out.TextCode
+		} else if out.Category != "" {
+			out.Type = out.Category
+		}
+		return out
+	}
+	out.Message = err.Error()
+	out.Type = "error"
+	return out
 }
 
 // SnapshotReader reports stored feature values by key.
@@ -622,16 +642,22 @@ func splitPath(path string) []string {
 	return out
 }
 
-func (h *helperSet) logHelperError(helper, errType, message string, context map[string]any) {
+func (h *helperSet) logHelperError(helper string, err error) {
 	if h == nil || h.cfg.Logger == nil {
 		return
 	}
-	h.cfg.Logger.Error("featuregate.helper_error",
+	args := []any{
 		"helper", helper,
-		"type", errType,
-		"error", message,
-		"context", context,
-	)
+		"error", err,
+	}
+	if rich, ok := featureerrors.As(err); ok {
+		args = append(args,
+			"category", rich.Category,
+			"text_code", rich.TextCode,
+			"metadata", rich.Metadata,
+		)
+	}
+	h.cfg.Logger.Error("featuregate.helper_error", args...)
 }
 
 func traceGate(featureGate gate.FeatureGate) gate.TraceableFeatureGate {
