@@ -6,13 +6,14 @@ import (
 	"strings"
 
 	"github.com/goliatone/go-admin/admin"
+	"github.com/goliatone/go-featuregate/featureerrors"
 	"github.com/goliatone/go-featuregate/scope"
 	opts "github.com/goliatone/go-options"
 	"github.com/goliatone/go-options/pkg/state"
 )
 
 // ErrPreferencesStoreRequired indicates a missing preferences store.
-var ErrPreferencesStoreRequired = fmt.Errorf("optionsadapter: preferences store is required")
+var ErrPreferencesStoreRequired = featureerrors.ErrPreferencesStoreRequired
 
 // PreferencesOption customizes the PreferencesStore adapter.
 type PreferencesOption func(*PreferencesStoreAdapter)
@@ -66,7 +67,7 @@ func WithKeys(keys ...string) PreferencesOption {
 // Load implements state.Store.
 func (a *PreferencesStoreAdapter) Load(ctx context.Context, ref state.Ref) (map[string]any, state.Meta, bool, error) {
 	if a == nil || a.store == nil {
-		return nil, state.Meta{}, false, ErrPreferencesStoreRequired
+		return nil, state.Meta{}, false, prefStoreRequiredError(ref.Scope, ref.Domain, "load")
 	}
 	level, prefScope, err := a.preferenceScope(ref.Scope)
 	if err != nil {
@@ -80,7 +81,13 @@ func (a *PreferencesStoreAdapter) Load(ctx context.Context, ref state.Ref) (map[
 		Keys:   keys,
 	})
 	if err != nil {
-		return nil, state.Meta{}, false, err
+		return nil, state.Meta{}, false, featureerrors.WrapExternal(err, featureerrors.TextCodeStoreReadFailed, "optionsadapter: preferences resolve failed", map[string]any{
+			featureerrors.MetaAdapter:   "options",
+			featureerrors.MetaStore:     "preferences",
+			featureerrors.MetaDomain:    strings.TrimSpace(ref.Domain),
+			featureerrors.MetaScope:     ref.Scope,
+			featureerrors.MetaOperation: "resolve",
+		})
 	}
 	if len(snapshot.Effective) == 0 {
 		return nil, state.Meta{}, false, nil
@@ -96,7 +103,15 @@ func (a *PreferencesStoreAdapter) Load(ctx context.Context, ref state.Ref) (map[
 			key = strings.TrimPrefix(key, prefix)
 		}
 		if err := setPath(result, key, value); err != nil {
-			return nil, state.Meta{}, false, err
+			meta := map[string]any{
+				featureerrors.MetaAdapter:   "options",
+				featureerrors.MetaStore:     "preferences",
+				featureerrors.MetaDomain:    strings.TrimSpace(ref.Domain),
+				featureerrors.MetaScope:     ref.Scope,
+				featureerrors.MetaOperation: "load",
+				featureerrors.MetaPath:      key,
+			}
+			return nil, state.Meta{}, false, featureerrors.WrapBadInput(err, featureerrors.TextCodePathInvalid, "optionsadapter: invalid path", meta)
 		}
 	}
 	if len(result) == 0 {
@@ -108,7 +123,7 @@ func (a *PreferencesStoreAdapter) Load(ctx context.Context, ref state.Ref) (map[
 // Save implements state.Store.
 func (a *PreferencesStoreAdapter) Save(ctx context.Context, ref state.Ref, snapshot map[string]any, _ state.Meta) (state.Meta, error) {
 	if a == nil || a.store == nil {
-		return state.Meta{}, ErrPreferencesStoreRequired
+		return state.Meta{}, prefStoreRequiredError(ref.Scope, ref.Domain, "save")
 	}
 	level, prefScope, err := a.preferenceScope(ref.Scope)
 	if err != nil {
@@ -122,7 +137,13 @@ func (a *PreferencesStoreAdapter) Save(ctx context.Context, ref state.Ref, snaps
 
 	existing, _, ok, err := a.Load(ctx, ref)
 	if err != nil {
-		return state.Meta{}, err
+		return state.Meta{}, featureerrors.WrapExternal(err, featureerrors.TextCodeStoreReadFailed, "optionsadapter: preferences load failed", map[string]any{
+			featureerrors.MetaAdapter:   "options",
+			featureerrors.MetaStore:     "preferences",
+			featureerrors.MetaDomain:    strings.TrimSpace(ref.Domain),
+			featureerrors.MetaScope:     ref.Scope,
+			featureerrors.MetaOperation: "load",
+		})
 	}
 
 	var deleteKeys []string
@@ -143,7 +164,13 @@ func (a *PreferencesStoreAdapter) Save(ctx context.Context, ref state.Ref, snaps
 			Level:  level,
 			Values: flat,
 		}); err != nil {
-			return state.Meta{}, err
+			return state.Meta{}, featureerrors.WrapExternal(err, featureerrors.TextCodeStoreWriteFailed, "optionsadapter: preferences upsert failed", map[string]any{
+				featureerrors.MetaAdapter:   "options",
+				featureerrors.MetaStore:     "preferences",
+				featureerrors.MetaDomain:    strings.TrimSpace(ref.Domain),
+				featureerrors.MetaScope:     ref.Scope,
+				featureerrors.MetaOperation: "upsert",
+			})
 		}
 	}
 
@@ -153,7 +180,13 @@ func (a *PreferencesStoreAdapter) Save(ctx context.Context, ref state.Ref, snaps
 			Level: level,
 			Keys:  deleteKeys,
 		}); err != nil {
-			return state.Meta{}, err
+			return state.Meta{}, featureerrors.WrapExternal(err, featureerrors.TextCodeStoreWriteFailed, "optionsadapter: preferences delete failed", map[string]any{
+				featureerrors.MetaAdapter:   "options",
+				featureerrors.MetaStore:     "preferences",
+				featureerrors.MetaDomain:    strings.TrimSpace(ref.Domain),
+				featureerrors.MetaScope:     ref.Scope,
+				featureerrors.MetaOperation: "delete",
+			})
 		}
 	}
 
@@ -183,21 +216,41 @@ func (a *PreferencesStoreAdapter) preferenceScope(scopeDef opts.Scope) (admin.Pr
 		}
 		return admin.PreferenceLevelUser, admin.PreferenceScope{UserID: id}, nil
 	default:
-		return "", admin.PreferenceScope{}, fmt.Errorf("optionsadapter: unsupported scope %q", scopeDef.Name)
+		return "", admin.PreferenceScope{}, featureerrors.NewBadInput(featureerrors.TextCodeScopeInvalid, fmt.Sprintf("optionsadapter: unsupported scope %q", scopeDef.Name), map[string]any{
+			featureerrors.MetaAdapter:   "options",
+			featureerrors.MetaStore:     "preferences",
+			featureerrors.MetaScope:     scopeDef.Name,
+			featureerrors.MetaOperation: "scope",
+		})
 	}
 }
 
 func extractScopeID(scopeDef opts.Scope, key string) (string, error) {
 	if scopeDef.Metadata == nil {
-		return "", fmt.Errorf("optionsadapter: missing metadata for scope %q", scopeDef.Name)
+		return "", featureerrors.NewBadInput(featureerrors.TextCodeScopeMetadataMissing, fmt.Sprintf("optionsadapter: missing metadata for scope %q", scopeDef.Name), map[string]any{
+			featureerrors.MetaAdapter:   "options",
+			featureerrors.MetaStore:     "preferences",
+			featureerrors.MetaScope:     scopeDef.Name,
+			featureerrors.MetaOperation: "scope_metadata",
+		})
 	}
 	raw, ok := scopeDef.Metadata[key]
 	if !ok {
-		return "", fmt.Errorf("optionsadapter: missing metadata key %q for scope %q", key, scopeDef.Name)
+		return "", featureerrors.NewBadInput(featureerrors.TextCodeScopeMetadataMissing, fmt.Sprintf("optionsadapter: missing metadata key %q for scope %q", key, scopeDef.Name), map[string]any{
+			featureerrors.MetaAdapter:   "options",
+			featureerrors.MetaStore:     "preferences",
+			featureerrors.MetaScope:     scopeDef.Name,
+			featureerrors.MetaOperation: "scope_metadata",
+		})
 	}
 	id, ok := raw.(string)
 	if !ok || strings.TrimSpace(id) == "" {
-		return "", fmt.Errorf("optionsadapter: invalid metadata key %q for scope %q", key, scopeDef.Name)
+		return "", featureerrors.NewBadInput(featureerrors.TextCodeScopeMetadataInvalid, fmt.Sprintf("optionsadapter: invalid metadata key %q for scope %q", key, scopeDef.Name), map[string]any{
+			featureerrors.MetaAdapter:   "options",
+			featureerrors.MetaStore:     "preferences",
+			featureerrors.MetaScope:     scopeDef.Name,
+			featureerrors.MetaOperation: "scope_metadata",
+		})
 	}
 	return strings.TrimSpace(id), nil
 }
@@ -248,3 +301,13 @@ func normalizePrefix(prefix string) string {
 }
 
 var _ state.Store[map[string]any] = (*PreferencesStoreAdapter)(nil)
+
+func prefStoreRequiredError(scopeDef opts.Scope, domain, operation string) error {
+	return featureerrors.WrapSentinel(featureerrors.ErrPreferencesStoreRequired, "optionsadapter: preferences store is required", map[string]any{
+		featureerrors.MetaAdapter:   "options",
+		featureerrors.MetaStore:     "preferences",
+		featureerrors.MetaDomain:    strings.TrimSpace(domain),
+		featureerrors.MetaScope:     scopeDef,
+		featureerrors.MetaOperation: operation,
+	})
+}
