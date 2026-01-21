@@ -109,7 +109,7 @@ func (s *Store) Get(ctx context.Context, key string, scopeSet gate.ScopeSet) (st
 		if s != nil {
 			domain = s.domain
 		}
-		return store.MissingOverride(), storeRequiredError(scopeSet, "get", domain)
+		return store.MissingOverride(), storeRequiredError(key, scopeSet, "get", domain)
 	}
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
@@ -148,7 +148,7 @@ func (s *Store) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, ena
 		if s != nil {
 			domain = s.domain
 		}
-		return storeRequiredError(scopeSet, "set", domain)
+		return storeRequiredError(key, scopeSet, "set", domain)
 	}
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
@@ -187,7 +187,7 @@ func (s *Store) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, a
 		if s != nil {
 			domain = s.domain
 		}
-		return storeRequiredError(scopeSet, "unset", domain)
+		return storeRequiredError(key, scopeSet, "unset", domain)
 	}
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
@@ -312,13 +312,17 @@ func overrideFromValue(key string, value any, scopeDef opts.Scope, domain string
 
 var _ store.ReadWriter = (*Store)(nil)
 
-func storeRequiredError(scopeSet gate.ScopeSet, operation, domain string) error {
+func storeRequiredError(key string, scopeSet gate.ScopeSet, operation, domain string) error {
+	trimmed := strings.TrimSpace(key)
+	normalized := gate.NormalizeKey(trimmed)
 	return featureerrors.WrapSentinel(featureerrors.ErrStoreRequired, "optionsadapter: state store is required", map[string]any{
-		featureerrors.MetaAdapter:   "options",
-		featureerrors.MetaStore:     "state",
-		featureerrors.MetaDomain:    strings.TrimSpace(domain),
-		featureerrors.MetaScope:     scopeSet,
-		featureerrors.MetaOperation: operation,
+		featureerrors.MetaAdapter:              "options",
+		featureerrors.MetaStore:                "state",
+		featureerrors.MetaDomain:               strings.TrimSpace(domain),
+		featureerrors.MetaScope:                scopeSet,
+		featureerrors.MetaOperation:            operation,
+		featureerrors.MetaFeatureKey:           trimmed,
+		featureerrors.MetaFeatureKeyNormalized: normalized,
 	})
 }
 
