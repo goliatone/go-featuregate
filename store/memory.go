@@ -2,18 +2,18 @@ package store
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"sync"
 
+	"github.com/goliatone/go-featuregate/featureerrors"
 	"github.com/goliatone/go-featuregate/gate"
 )
 
 // ErrMemoryStoreRequired signals a missing memory store.
-var ErrMemoryStoreRequired = errors.New("store: memory store is required")
+var ErrMemoryStoreRequired = featureerrors.ErrStoreRequired
 
 // ErrInvalidKey signals a missing or invalid feature key.
-var ErrInvalidKey = errors.New("store: feature key required")
+var ErrInvalidKey = featureerrors.ErrInvalidKey
 
 // MemoryStore keeps overrides in memory for tests and examples.
 type MemoryStore struct {
@@ -43,7 +43,7 @@ func NewMemoryStore() *MemoryStore {
 // Get implements Reader.
 func (m *MemoryStore) Get(_ context.Context, key string, scopeSet gate.ScopeSet) (Override, error) {
 	if m == nil {
-		return MissingOverride(), ErrMemoryStoreRequired
+		return MissingOverride(), storeRequiredError(key, scopeSet, "get")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
@@ -69,7 +69,7 @@ func (m *MemoryStore) Get(_ context.Context, key string, scopeSet gate.ScopeSet)
 // Set implements Writer.
 func (m *MemoryStore) Set(_ context.Context, key string, scopeSet gate.ScopeSet, enabled bool, _ gate.ActorRef) error {
 	if m == nil {
-		return ErrMemoryStoreRequired
+		return storeRequiredError(key, scopeSet, "set")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
@@ -95,7 +95,7 @@ func (m *MemoryStore) Set(_ context.Context, key string, scopeSet gate.ScopeSet,
 // Unset implements Writer.
 func (m *MemoryStore) Unset(_ context.Context, key string, scopeSet gate.ScopeSet, _ gate.ActorRef) error {
 	if m == nil {
-		return ErrMemoryStoreRequired
+		return storeRequiredError(key, scopeSet, "unset")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
@@ -151,9 +151,14 @@ func (m *MemoryStore) Clear() {
 }
 
 func normalizeKey(key string) (string, error) {
-	normalized := gate.NormalizeKey(strings.TrimSpace(key))
+	trimmed := strings.TrimSpace(key)
+	normalized := gate.NormalizeKey(trimmed)
 	if normalized == "" {
-		return "", ErrInvalidKey
+		return "", featureerrors.WrapSentinel(featureerrors.ErrInvalidKey, "store: feature key required", map[string]any{
+			featureerrors.MetaFeatureKey:           trimmed,
+			featureerrors.MetaFeatureKeyNormalized: normalized,
+			featureerrors.MetaStore:                "memory",
+		})
 	}
 	return normalized, nil
 }
@@ -187,3 +192,15 @@ func writeScope(scopeSet gate.ScopeSet) scopeKey {
 }
 
 var _ ReadWriter = (*MemoryStore)(nil)
+
+func storeRequiredError(key string, scopeSet gate.ScopeSet, operation string) error {
+	trimmed := strings.TrimSpace(key)
+	normalized := gate.NormalizeKey(trimmed)
+	return featureerrors.WrapSentinel(featureerrors.ErrStoreRequired, "store: memory store is required", map[string]any{
+		featureerrors.MetaFeatureKey:           trimmed,
+		featureerrors.MetaFeatureKeyNormalized: normalized,
+		featureerrors.MetaScope:                scopeSet,
+		featureerrors.MetaStore:                "memory",
+		featureerrors.MetaOperation:            operation,
+	})
+}
