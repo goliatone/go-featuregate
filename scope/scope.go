@@ -10,6 +10,7 @@ import (
 type contextKey string
 
 const (
+	systemKey   contextKey = "featuregate.system"
 	tenantIDKey contextKey = "featuregate.tenant_id"
 	orgIDKey    contextKey = "featuregate.org_id"
 	userIDKey   contextKey = "featuregate.user_id"
@@ -21,19 +22,56 @@ const (
 	MetadataUserID   = "user_id"
 )
 
+// WithSystem stores a system scope flag in context.
+func WithSystem(ctx context.Context, system bool) context.Context {
+	return context.WithValue(ctx, systemKey, system)
+}
+
 // WithTenantID stores a tenant identifier in context.
 func WithTenantID(ctx context.Context, tenantID string) context.Context {
-	return context.WithValue(ctx, tenantIDKey, strings.TrimSpace(tenantID))
+	trimmed := strings.TrimSpace(tenantID)
+	if trimmed == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, tenantIDKey, trimmed)
 }
 
 // WithOrgID stores an org identifier in context.
 func WithOrgID(ctx context.Context, orgID string) context.Context {
-	return context.WithValue(ctx, orgIDKey, strings.TrimSpace(orgID))
+	trimmed := strings.TrimSpace(orgID)
+	if trimmed == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, orgIDKey, trimmed)
 }
 
 // WithUserID stores a user identifier in context.
 func WithUserID(ctx context.Context, userID string) context.Context {
-	return context.WithValue(ctx, userIDKey, strings.TrimSpace(userID))
+	trimmed := strings.TrimSpace(userID)
+	if trimmed == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, userIDKey, trimmed)
+}
+
+// ClearTenantID clears a tenant identifier from context.
+func ClearTenantID(ctx context.Context) context.Context {
+	return context.WithValue(ctx, tenantIDKey, "")
+}
+
+// ClearOrgID clears an org identifier from context.
+func ClearOrgID(ctx context.Context) context.Context {
+	return context.WithValue(ctx, orgIDKey, "")
+}
+
+// ClearUserID clears a user identifier from context.
+func ClearUserID(ctx context.Context) context.Context {
+	return context.WithValue(ctx, userIDKey, "")
+}
+
+// System extracts the system scope flag from context.
+func System(ctx context.Context) bool {
+	return toBool(ctx.Value(systemKey))
 }
 
 // TenantID extracts the tenant identifier from context.
@@ -56,6 +94,9 @@ func FromContext(ctx context.Context) gate.ScopeSet {
 	if ctx == nil {
 		return gate.ScopeSet{}
 	}
+	if System(ctx) {
+		return gate.ScopeSet{System: true}
+	}
 	return gate.ScopeSet{
 		TenantID: TenantID(ctx),
 		OrgID:    OrgID(ctx),
@@ -71,4 +112,14 @@ func toString(value any) string {
 		return strings.TrimSpace(s)
 	}
 	return ""
+}
+
+func toBool(value any) bool {
+	if value == nil {
+		return false
+	}
+	if flag, ok := value.(bool); ok {
+		return flag
+	}
+	return false
 }
