@@ -136,7 +136,7 @@ func TestGateStrictStoreReturnsError(t *testing.T) {
 	}
 }
 
-func TestGateResolvesAliasOverride(t *testing.T) {
+func TestGateDoesNotResolveLegacyAliasOverride(t *testing.T) {
 	ctx := context.Background()
 	storeStub := &stubStore{
 		overrides: map[string]store.Override{
@@ -149,18 +149,18 @@ func TestGateResolvesAliasOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !value {
-		t.Fatalf("expected alias override to enable feature")
+	if value {
+		t.Fatalf("expected legacy alias override to be ignored")
 	}
-	if len(storeStub.getCalls) != 2 {
-		t.Fatalf("expected 2 get calls, got %d", len(storeStub.getCalls))
+	if len(storeStub.getCalls) != 1 {
+		t.Fatalf("expected 1 get call, got %d", len(storeStub.getCalls))
 	}
-	if storeStub.getCalls[0] != "users.signup" || storeStub.getCalls[1] != "users.self_registration" {
+	if storeStub.getCalls[0] != "users.signup" {
 		t.Fatalf("unexpected get call order: %v", storeStub.getCalls)
 	}
 }
 
-func TestGateUnsetClearsAliases(t *testing.T) {
+func TestGateUnsetDoesNotClearLegacyAliases(t *testing.T) {
 	ctx := context.Background()
 	storeStub := &stubStore{}
 	g := New(WithOverrideWriter(storeStub))
@@ -168,10 +168,10 @@ func TestGateUnsetClearsAliases(t *testing.T) {
 	if err := g.Unset(ctx, "users.signup", gate.ScopeSet{TenantID: "tenant-1"}, gate.ActorRef{ID: "actor"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(storeStub.unsetCalls) != 2 {
-		t.Fatalf("expected 2 unset calls, got %d", len(storeStub.unsetCalls))
+	if len(storeStub.unsetCalls) != 1 {
+		t.Fatalf("expected 1 unset call, got %d", len(storeStub.unsetCalls))
 	}
-	if storeStub.unsetCalls[0] != "users.signup" || storeStub.unsetCalls[1] != "users.self_registration" {
+	if storeStub.unsetCalls[0] != "users.signup" {
 		t.Fatalf("unexpected unset call order: %v", storeStub.unsetCalls)
 	}
 }
