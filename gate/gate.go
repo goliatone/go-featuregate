@@ -10,6 +10,16 @@ type ScopeSet struct {
 	UserID   string
 }
 
+// NormalizeScopeSet ensures system scope ignores tenant/org/user IDs.
+func NormalizeScopeSet(scopeSet ScopeSet) ScopeSet {
+	if scopeSet.System {
+		scopeSet.TenantID = ""
+		scopeSet.OrgID = ""
+		scopeSet.UserID = ""
+	}
+	return scopeSet
+}
+
 // ScopeResolver derives a ScopeSet from context.
 type ScopeResolver interface {
 	Resolve(ctx context.Context) (ScopeSet, error)
