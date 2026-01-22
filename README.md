@@ -80,6 +80,27 @@ Runtime overrides flow through `store.Reader`/`store.Writer`. The `resolver.Gate
 and examples.
 
 The default SQL schema lives in `schema/feature_flags.sql`. `enabled` is nullable: `NULL` represents
+### Feature metadata catalog
+
+UI descriptions live in a separate catalog so the gate remains focused on boolean resolution. Use
+`catalog.StaticCatalog` with `configadapter.NewCatalog` to load descriptions from config:
+
+```go
+meta := configadapter.NewCatalog(map[string]any{
+	"users": map[string]any{
+		"signup": map[string]any{
+			"description": "Allow self-signup",
+		},
+	},
+})
+
+def, _ := meta.Get("users.signup")
+text, _ := catalog.PlainResolver{}.Resolve(ctx, "en", def.Description)
+```
+
+Descriptions are stored as `catalog.Message` so you can later swap in a localization-aware
+resolver without changing the catalog API.
+
 an explicit unset (fall back to config defaults). The bun adapter sets `enabled = NULL` on `Unset`;
 stores that expose `Delete` remove the row entirely for cleanup. The options adapter deletes the key
 path from the snapshot to represent an unset.
