@@ -29,14 +29,13 @@ gate := resolver.New(
 
 ## Concepts
 
-### Key naming and aliasing
+### Key naming and normalization
 
 Feature keys are dot-scoped strings (for example `users.signup`, `dashboard`). Common keys include
-`users.invite`, `users.password_reset`, `users.signup`, `cms`, `dashboard`, `notifications`, and
-`debug`. Normalize keys with `gate.NormalizeKey` to trim whitespace and apply aliases. The legacy
-key `users.self_registration` is treated as an alias of `users.signup`; `resolver.Gate` will check
-alias overrides when the canonical key has no stored value, and `Unset` clears both the canonical
-key and its aliases.
+`users.invite`, `users.password_reset`, `users.password_reset.finalize`, `users.signup`, `cms`,
+`dashboard`, `notifications`, and `debug`. Normalize keys with `gate.NormalizeKey` to trim
+whitespace. The legacy key `users.self_registration` is not normalized or checked; use
+`users.signup`.
 
 ### Scope derivation and overrides
 
@@ -57,6 +56,20 @@ Resolution order:
 Overrides are tri-state (`enabled`, `disabled`, `unset`). Use `Unset` to explicitly clear a value
 and fall back to config defaults. Store errors fail open by default; enable strict behavior with
 `resolver.WithStrictStore(true)` to fail closed and surface the error.
+
+### Guard helpers
+
+Use `gate/guard` to enforce feature checks with optional override keys and custom error mapping:
+
+```go
+if err := guard.Require(ctx, gate, "users.signup",
+	guard.WithDisabledError(errors.New("signup disabled")),
+	guard.WithOverrides("users.signup.override"),
+	guard.WithErrorMapper(mapGateErr),
+); err != nil {
+	return err
+}
+```
 
 ### Runtime overrides and storage
 
@@ -116,11 +129,12 @@ gate := resolver.New(
 )
 ```
 
-Use the PreferencesStore adapter when go-admin is the backing store:
+Use the PreferencesStore adapter from go-admin (`github.com/goliatone/go-admin/featuregate/adapter`)
+when go-admin is the backing store:
 
 ```go
 prefs := admin.NewInMemoryPreferencesStore()
-stateStore := optionsadapter.NewPreferencesStoreAdapter(prefs)
+stateStore := featuregateadapter.NewPreferencesStoreAdapter(prefs)
 overrides := optionsadapter.NewStore(stateStore, optionsadapter.WithDomain("feature_flags"))
 ```
 
@@ -144,7 +158,7 @@ to control the `updated_by` audit value.
 
 ### goauthadapter
 
-Derive scope and actor metadata from go-auth:
+Derive scope and actor metadata from go-auth (import from `github.com/goliatone/go-auth/adapters/featuregate`):
 
 ```go
 scopeResolver := goauthadapter.NewScopeResolver()
