@@ -169,34 +169,6 @@ gate := resolver.New(
 
 Use `goauthadapter.ActorRefFromContext` when persisting overrides.
 
-### routeradapter
-
-Helpers for go-router contexts:
-
-- `routeradapter.Context(ctx)` returns a standard `context.Context`.
-- `routeradapter.ScopeSet(ctx)` derives a `gate.ScopeSet`.
-- `routeradapter.WithRouterContext(ctx)` provides a resolve option.
-
-### gologgeradapter
-
-Log resolve/update events via go-logger:
-
-```go
-hook := gologgeradapter.New(logger)
-gate := resolver.New(
-	resolver.WithResolveHook(hook),
-	resolver.WithActivityHook(hook),
-)
-```
-
-### urlkitadapter
-
-Wrap a go-urlkit resolver as a `urlbuilder.Builder`:
-
-```go
-builder := urlkitadapter.New(manager)
-```
-
 ## Template helpers
 
 Register helpers with your template engine (e.g., `WithTemplateFunc`):
