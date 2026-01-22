@@ -1,11 +1,24 @@
 # Changelog
 
-# [Unreleased] - (TBD)
+# [0.2.0](https://github.com/goliatone/go-featuregate/compare/v0.1.0...v0.2.0) - (2026-01-22)
 
-## <!-- 0 -->💥 Breaking Changes
+## <!-- 13 -->📦 Bumps
 
-- Remove the go-admin PreferencesStore adapter from go-featuregate; use
-  `github.com/goliatone/go-admin/featuregate/adapter` instead.
+- Bump version: v0.2.0 ([96f25ea](https://github.com/goliatone/go-featuregate/commit/96f25eae7d41de832cd28095e13fe8d99d4fdfec))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Gate guard helper ([27bc133](https://github.com/goliatone/go-featuregate/commit/27bc133048c19674f4b5c33bcb8544f10e79b246))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.1.0 ([f506aff](https://github.com/goliatone/go-featuregate/commit/f506aff124bd5d9e0715c39769ad568ad8358150))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update deps ([74c9e0e](https://github.com/goliatone/go-featuregate/commit/74c9e0e787f7347d20ab520fec71972a5b60ddcd))  - (goliatone)
+- Update docs ([2aab5c1](https://github.com/goliatone/go-featuregate/commit/2aab5c1d7a1bf14077ab6af8451eeefc9008b2d2))  - (goliatone)
+- Update tests ([f349cfc](https://github.com/goliatone/go-featuregate/commit/f349cfce69ae5e71f4560c77e4572d9f9211ba46))  - (goliatone)
 
 # [0.1.0](https://github.com/goliatone/go-featuregate/tree/v0.1.0) - (2026-01-21)
 
@@ -51,4 +64,5 @@
 - Update tests ([fe59692](https://github.com/goliatone/go-featuregate/commit/fe59692d3aadb8ffb0fc3fbe05655399d11e2238))  - (goliatone)
 - Update format ([be13013](https://github.com/goliatone/go-featuregate/commit/be13013f83b991ee0b34d935d7564462f87208b3))  - (goliatone)
 - Initial commit ([43e4bc2](https://github.com/goliatone/go-featuregate/commit/43e4bc269511d0da2fae6d558bc41fcc5af664ea))  - (goliatone)
+
 
