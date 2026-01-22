@@ -6,15 +6,15 @@ import (
 )
 
 const (
-	FeatureUsersSignup           = "users.signup"
-	FeatureUsersSelfRegistration = "users.self_registration"
+	FeatureUsersSignup        = "users.signup"
+	FeatureUsersPasswordReset = "users.password_reset"
+	// FeatureUsersPasswordResetFinalize duplicates the go-auth string (go-auth owns the literal).
+	FeatureUsersPasswordResetFinalize = "users.password_reset.finalize"
 )
 
-var keyAliases = map[string]string{
-	FeatureUsersSelfRegistration: FeatureUsersSignup,
-}
+var keyAliases = map[string]string{} // Legacy aliases are intentionally disabled.
 
-// NormalizeKey trims whitespace and resolves any known aliases.
+// NormalizeKey trims whitespace and resolves any known aliases (if configured).
 func NormalizeKey(key string) string {
 	key = strings.TrimSpace(key)
 	if key == "" {
@@ -41,7 +41,7 @@ func IsAlias(key string) bool {
 	return ok
 }
 
-// AliasesFor returns the legacy alias keys for the provided key.
+// AliasesFor returns the legacy alias keys for the provided key, if any.
 func AliasesFor(key string) []string {
 	normalized := NormalizeKey(key)
 	if normalized == "" {
