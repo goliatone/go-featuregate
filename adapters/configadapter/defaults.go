@@ -13,7 +13,7 @@ type configOptions struct {
 	delimiter string
 }
 
-// Option configures defaults parsing.
+// Option configures configadapter parsing.
 type Option func(*configOptions)
 
 // WithDelimiter sets the key delimiter used when flattening nested maps.
