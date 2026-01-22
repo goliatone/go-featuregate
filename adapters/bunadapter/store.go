@@ -274,6 +274,9 @@ const (
 )
 
 func readScopes(scopeSet gate.ScopeSet) []scopeKey {
+	if scopeSet.System {
+		return []scopeKey{{kind: scopeSystem}}
+	}
 	scopes := make([]scopeKey, 0, 4)
 	if scopeSet.UserID != "" {
 		scopes = append(scopes, scopeKey{kind: scopeUser, id: scopeSet.UserID})
@@ -290,6 +293,8 @@ func readScopes(scopeSet gate.ScopeSet) []scopeKey {
 
 func writeScope(scopeSet gate.ScopeSet) scopeKey {
 	switch {
+	case scopeSet.System:
+		return scopeKey{kind: scopeSystem}
 	case scopeSet.UserID != "":
 		return scopeKey{kind: scopeUser, id: scopeSet.UserID}
 	case scopeSet.OrgID != "":
