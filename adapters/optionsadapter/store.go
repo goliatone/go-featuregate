@@ -229,6 +229,9 @@ func (s *Store) writeRef(scopeSet gate.ScopeSet) (state.Ref, error) {
 }
 
 func defaultScopes(scopeSet gate.ScopeSet) []opts.Scope {
+	if scopeSet.System {
+		return []opts.Scope{scoped("system", "System", prioritySystem, "", "")}
+	}
 	var scopes []opts.Scope
 	if scopeSet.UserID != "" {
 		scopes = append(scopes, scoped("user", "User", priorityUser, scope.MetadataUserID, scopeSet.UserID))
@@ -245,6 +248,8 @@ func defaultScopes(scopeSet gate.ScopeSet) []opts.Scope {
 
 func writeScope(scopeSet gate.ScopeSet) opts.Scope {
 	switch {
+	case scopeSet.System:
+		return scoped("system", "System", prioritySystem, "", "")
 	case scopeSet.UserID != "":
 		return scoped("user", "User", priorityUser, scope.MetadataUserID, scopeSet.UserID)
 	case scopeSet.OrgID != "":
