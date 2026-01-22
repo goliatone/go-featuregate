@@ -171,6 +171,7 @@ func (g *Gate) ResolveWithTrace(ctx context.Context, key string, opts ...gate.Re
 func (g *Gate) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, enabled bool, actor gate.ActorRef) error {
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
+	scopeSet = gate.NormalizeScopeSet(scopeSet)
 	if g.writer == nil {
 		return ferrors.WrapSentinel(ferrors.ErrStoreUnavailable, "", map[string]any{
 			ferrors.MetaFeatureKey:           trimmed,
@@ -215,6 +216,7 @@ func (g *Gate) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, enab
 func (g *Gate) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, actor gate.ActorRef) error {
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
+	scopeSet = gate.NormalizeScopeSet(scopeSet)
 	if g.writer == nil {
 		return ferrors.WrapSentinel(ferrors.ErrStoreUnavailable, "", map[string]any{
 			ferrors.MetaFeatureKey:           trimmed,
@@ -406,12 +408,13 @@ func (g *Gate) resolveScope(ctx context.Context, opts ...gate.ResolveOption) (ga
 		}
 	}
 	if req.ScopeSet != nil {
-		return *req.ScopeSet, nil
+		return gate.NormalizeScopeSet(*req.ScopeSet), nil
 	}
 	if g.scopeResolver != nil {
-		return g.scopeResolver.Resolve(ctx)
+		scopeSet, err := g.scopeResolver.Resolve(ctx)
+		return gate.NormalizeScopeSet(scopeSet), err
 	}
-	return scope.FromContext(ctx), nil
+	return gate.NormalizeScopeSet(scope.FromContext(ctx)), nil
 }
 
 func (g *Gate) writeCache(ctx context.Context, key string, scopeSet gate.ScopeSet, trace gate.ResolveTrace, storeErr error) {
