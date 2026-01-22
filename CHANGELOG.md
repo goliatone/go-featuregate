@@ -1,5 +1,12 @@
 # Changelog
 
+# [Unreleased] - (TBD)
+
+## <!-- 0 -->💥 Breaking Changes
+
+- Remove the go-admin PreferencesStore adapter from go-featuregate; use
+  `github.com/goliatone/go-admin/featuregate/adapter` instead.
+
 # [0.1.0](https://github.com/goliatone/go-featuregate/tree/v0.1.0) - (2026-01-21)
 
 ## <!-- 1 -->🐛 Bug Fixes
@@ -44,5 +51,4 @@
 - Update tests ([fe59692](https://github.com/goliatone/go-featuregate/commit/fe59692d3aadb8ffb0fc3fbe05655399d11e2238))  - (goliatone)
 - Update format ([be13013](https://github.com/goliatone/go-featuregate/commit/be13013f83b991ee0b34d935d7564462f87208b3))  - (goliatone)
 - Initial commit ([43e4bc2](https://github.com/goliatone/go-featuregate/commit/43e4bc269511d0da2fae6d558bc41fcc5af664ea))  - (goliatone)
-
 
