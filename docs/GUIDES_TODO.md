@@ -303,6 +303,35 @@ This document tracks user guides for `go-featuregate`. Each guide helps users un
 
 ---
 
+## 13. GUIDE_CATALOG.md
+
+**Status**: `review`
+
+**Purpose**: Providing feature flag metadata and descriptions for UIs and documentation.
+
+**Sections**:
+- Catalog architecture overview
+- Separation of concerns (catalog vs resolution)
+- Core types:
+  - `Message` (text, key, args for i18n)
+  - `FeatureDefinition` (key + description)
+  - `Catalog` interface (`Get`, `List`)
+- `StaticCatalog` implementation
+- Config adapter integration:
+  - `configadapter.NewCatalog` for nested maps
+  - Supported description formats
+  - Custom delimiters
+- `MessageResolver` for localization:
+  - `PlainResolver` (default)
+  - Custom resolver implementation
+- Building admin UIs with catalog
+- Combining catalog with feature gate
+
+**Primary Audience**: Full-stack developers
+**Complexity**: Intermediate
+
+---
+
 ## Summary
 
 | Guide | Audience | Complexity | Status |
