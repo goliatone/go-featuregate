@@ -39,12 +39,14 @@ whitespace. The legacy key `users.self_registration` is not normalized or checke
 
 ### Scope derivation and overrides
 
-Scopes are represented by `gate.ScopeSet` (`System`, `TenantID`, `OrgID`, `UserID`). By default,
-`resolver.Gate` derives scope from `context.Context` using `scope.FromContext` (see
-`scope.WithTenantID`, `scope.WithOrgID`, `scope.WithUserID`). Scope metadata keys are
-`tenant_id`, `org_id`, and `user_id`. Override scope explicitly with `gate.WithScopeSet`,
-especially for boot/test flows that should resolve at system scope (use `ScopeSet{System: true}`
-or empty IDs). Precedence is user > org > tenant > system.
+Scopes are represented by `gate.ScopeSet` (`System`, `TenantID`, `OrgID`, `UserID`). `System`
+explicitly forces system scope and ignores tenant/org/user IDs. By default, `resolver.Gate`
+derives scope from `context.Context` using `scope.FromContext` (see `scope.WithSystem`,
+`scope.WithTenantID`, `scope.WithOrgID`, `scope.WithUserID`). Scope metadata keys are `tenant_id`,
+`org_id`, and `user_id`. Scope helpers ignore empty values; use `scope.ClearTenantID`,
+`scope.ClearOrgID`, and `scope.ClearUserID` to clear values explicitly. Override scope explicitly
+with `gate.WithScopeSet`, especially for boot/test flows that should resolve at system scope (use
+`ScopeSet{System: true}`). Precedence is user > org > tenant > system when `System` is false.
 
 ### Resolution order and unset semantics
 
