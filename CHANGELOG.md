@@ -1,5 +1,23 @@
 # Changelog
 
+# [0.3.0](https://github.com/goliatone/go-featuregate/compare/v0.2.0...v0.3.0) - (2026-01-22)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.3.0 ([7ad71c0](https://github.com/goliatone/go-featuregate/commit/7ad71c0254d626e39fb976abbb6e2832df772851))  - (goliatone)
+
+## <!-- 2 -->🚜 Refactor
+
+- Remove adapters ([49938d3](https://github.com/goliatone/go-featuregate/commit/49938d34a28314a54baed488809e403f5992e0f0))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.2.0 ([ceeb2f7](https://github.com/goliatone/go-featuregate/commit/ceeb2f745dd41b7dfeeff566f46616bee1d5d703))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update readme ([261037d](https://github.com/goliatone/go-featuregate/commit/261037dca7d4b19d665d68ecf737295cc9c129cd))  - (goliatone)
+
 # [0.2.0](https://github.com/goliatone/go-featuregate/compare/v0.1.0...v0.2.0) - (2026-01-22)
 
 ## <!-- 13 -->📦 Bumps
