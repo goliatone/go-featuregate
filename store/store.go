@@ -37,15 +37,21 @@ func (o Override) HasValue() bool {
 	return o.State == gate.OverrideStateEnabled || o.State == gate.OverrideStateDisabled
 }
 
+// OverrideMatch captures an override match for a scope reference.
+type OverrideMatch struct {
+	Scope    gate.ScopeRef
+	Override Override
+}
+
 // Reader resolves runtime overrides.
 type Reader interface {
-	Get(ctx context.Context, key string, scope gate.ScopeSet) (Override, error)
+	GetAll(ctx context.Context, key string, chain gate.ScopeChain) ([]OverrideMatch, error)
 }
 
 // Writer stores runtime overrides.
 type Writer interface {
-	Set(ctx context.Context, key string, scope gate.ScopeSet, enabled bool, actor gate.ActorRef) error
-	Unset(ctx context.Context, key string, scope gate.ScopeSet, actor gate.ActorRef) error
+	Set(ctx context.Context, key string, scope gate.ScopeRef, enabled bool, actor gate.ActorRef) error
+	Unset(ctx context.Context, key string, scope gate.ScopeRef, actor gate.ActorRef) error
 }
 
 // ReadWriter is a combined reader/writer.
