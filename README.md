@@ -39,14 +39,13 @@ whitespace. The legacy key `users.self_registration` is not normalized or checke
 
 ### Scope derivation and overrides
 
-Scopes are represented by `gate.ScopeSet` (`System`, `TenantID`, `OrgID`, `UserID`). `System`
-explicitly forces system scope and ignores tenant/org/user IDs. By default, `resolver.Gate`
-derives scope from `context.Context` using `scope.FromContext` (see `scope.WithSystem`,
-`scope.WithTenantID`, `scope.WithOrgID`, `scope.WithUserID`). Scope metadata keys are `tenant_id`,
-`org_id`, and `user_id`. Scope helpers ignore empty values; use `scope.ClearTenantID`,
-`scope.ClearOrgID`, and `scope.ClearUserID` to clear values explicitly. Override scope explicitly
-with `gate.WithScopeSet`, especially for boot/test flows that should resolve at system scope (use
-`ScopeSet{System: true}`). Precedence is user > org > tenant > system when `System` is false.
+Scopes are represented by `gate.ScopeRef` and `gate.ScopeChain`. A chain is an ordered list of
+scope refs (user → role/perm → org → tenant → system by default). By default, `resolver.Gate`
+derives claims from `context.Context` using `scope.ClaimsFromContext` (see `scope.WithTenantID`,
+`scope.WithOrgID`, `scope.WithUserID`). Scope metadata keys are `tenant_id`, `org_id`, and `user_id`.
+Scope helpers ignore empty values; use `scope.ClearTenantID`, `scope.ClearOrgID`, and
+`scope.ClearUserID` to clear values explicitly. Override scope explicitly with `gate.WithScopeChain`
+for boot/test flows or when you want to bypass claims resolution.
 
 ### Resolution order and unset semantics
 
