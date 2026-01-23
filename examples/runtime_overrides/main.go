@@ -22,10 +22,14 @@ func main() {
 	)
 
 	ctx := context.Background()
-	scope := fggate.ScopeSet{TenantID: "acme"}
+	scope := fggate.ScopeRef{Kind: fggate.ScopeTenant, ID: "acme", TenantID: "acme"}
+	chain := fggate.ScopeChain{
+		scope,
+		{Kind: fggate.ScopeSystem},
+	}
 	actor := fggate.ActorRef{ID: "admin-1", Type: "user"}
 
-	value, err := featureGate.Enabled(ctx, "dashboard", fggate.WithScopeSet(scope))
+	value, err := featureGate.Enabled(ctx, "dashboard", fggate.WithScopeChain(chain))
 	if err != nil {
 		fmt.Println("default resolve error:", err)
 		return
@@ -36,7 +40,7 @@ func main() {
 		fmt.Println("set override error:", err)
 		return
 	}
-	value, err = featureGate.Enabled(ctx, "dashboard", fggate.WithScopeSet(scope))
+	value, err = featureGate.Enabled(ctx, "dashboard", fggate.WithScopeChain(chain))
 	if err != nil {
 		fmt.Println("override resolve error:", err)
 		return
@@ -47,7 +51,7 @@ func main() {
 		fmt.Println("unset override error:", err)
 		return
 	}
-	value, err = featureGate.Enabled(ctx, "dashboard", fggate.WithScopeSet(scope))
+	value, err = featureGate.Enabled(ctx, "dashboard", fggate.WithScopeChain(chain))
 	if err != nil {
 		fmt.Println("unset resolve error:", err)
 		return
