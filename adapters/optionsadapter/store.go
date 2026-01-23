@@ -19,6 +19,8 @@ const (
 	priorityTenant = 20
 	priorityOrg    = 30
 	priorityUser   = 40
+	priorityRole   = 50
+	priorityPerm   = 60
 )
 
 // DefaultDomain is the default options domain used for feature overrides.
@@ -30,8 +32,8 @@ var ErrStoreRequired = ferrors.ErrStoreRequired
 // ErrInvalidKey indicates a missing or invalid feature key.
 var ErrInvalidKey = ferrors.ErrInvalidKey
 
-// ScopeBuilder maps a ScopeSet into go-options scopes ordered by precedence.
-type ScopeBuilder func(scopeSet gate.ScopeSet) []opts.Scope
+// ScopeBuilder maps a ScopeRef into a go-options scope.
+type ScopeBuilder func(ref gate.ScopeRef) opts.Scope
 
 // MetaBuilder builds storage metadata from an actor reference.
 type MetaBuilder func(actor gate.ActorRef) state.Meta
@@ -52,7 +54,7 @@ func NewStore(stateStore state.Store[map[string]any], opts ...Option) *Store {
 	adapter := &Store{
 		stateStore: stateStore,
 		domain:     DefaultDomain,
-		scopes:     defaultScopes,
+		scopes:     defaultScopeFromRef,
 		meta:       defaultMeta,
 	}
 	for _, opt := range opts {
@@ -64,7 +66,7 @@ func NewStore(stateStore state.Store[map[string]any], opts ...Option) *Store {
 		adapter.domain = DefaultDomain
 	}
 	if adapter.scopes == nil {
-		adapter.scopes = defaultScopes
+		adapter.scopes = defaultScopeFromRef
 	}
 	if adapter.meta == nil {
 		adapter.meta = defaultMeta
@@ -102,61 +104,63 @@ func WithMetaBuilder(builder MetaBuilder) Option {
 	}
 }
 
-// Get implements store.Reader.
-func (s *Store) Get(ctx context.Context, key string, scopeSet gate.ScopeSet) (store.Override, error) {
+// GetAll implements store.Reader.
+func (s *Store) GetAll(ctx context.Context, key string, chain gate.ScopeChain) ([]store.OverrideMatch, error) {
 	if s == nil || s.stateStore == nil {
 		domain := ""
 		if s != nil {
 			domain = s.domain
 		}
-		return store.MissingOverride(), storeRequiredError(key, scopeSet, "get", domain)
+		return nil, storeRequiredError(key, gate.ScopeRef{}, "get_all", domain)
 	}
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
 	if normalized == "" {
-		return store.MissingOverride(), invalidKeyError(trimmed, normalized, scopeSet, "get", s.domain)
+		return nil, invalidKeyError(trimmed, normalized, gate.ScopeRef{}, "get_all", s.domain)
 	}
-
-	scopes := s.scopes(scopeSet)
-	if len(scopes) == 0 {
-		return store.MissingOverride(), nil
-	}
-
-	for _, scopeDef := range scopes {
+	matches := make([]store.OverrideMatch, 0)
+	for _, ref := range chain {
+		scopeDef := s.scopes(ref)
 		snapshot, _, ok, err := s.stateStore.Load(ctx, state.Ref{Domain: s.domain, Scope: scopeDef})
 		if err != nil {
 			meta := storeMeta(scopeDef, "load", s.domain)
 			meta[ferrors.MetaFeatureKey] = trimmed
 			meta[ferrors.MetaFeatureKeyNormalized] = normalized
-			return store.MissingOverride(), ferrors.WrapExternal(err, ferrors.TextCodeStoreReadFailed, "optionsadapter: load failed", meta)
+			return nil, ferrors.WrapExternal(err, ferrors.TextCodeStoreReadFailed, "optionsadapter: load failed", meta)
 		}
 		if !ok || len(snapshot) == 0 {
 			continue
 		}
 		if value, found := lookupPath(snapshot, normalized); found {
-			return overrideFromValue(normalized, value, scopeDef, s.domain)
+			override, err := overrideFromValue(normalized, value, scopeDef, s.domain)
+			if err != nil {
+				return nil, err
+			}
+			matches = append(matches, store.OverrideMatch{
+				Scope:    ref,
+				Override: override,
+			})
 		}
 	}
-
-	return store.MissingOverride(), nil
+	return matches, nil
 }
 
 // Set implements store.Writer.
-func (s *Store) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, enabled bool, actor gate.ActorRef) error {
+func (s *Store) Set(ctx context.Context, key string, scopeRef gate.ScopeRef, enabled bool, actor gate.ActorRef) error {
 	if s == nil || s.stateStore == nil {
 		domain := ""
 		if s != nil {
 			domain = s.domain
 		}
-		return storeRequiredError(key, scopeSet, "set", domain)
+		return storeRequiredError(key, scopeRef, "set", domain)
 	}
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
 	if normalized == "" {
-		return invalidKeyError(trimmed, normalized, scopeSet, "set", s.domain)
+		return invalidKeyError(trimmed, normalized, scopeRef, "set", s.domain)
 	}
 
-	ref, err := s.writeRef(scopeSet)
+	ref, err := s.writeRef(scopeRef)
 	if err != nil {
 		return err
 	}
@@ -181,21 +185,21 @@ func (s *Store) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, ena
 }
 
 // Unset implements store.Writer.
-func (s *Store) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, actor gate.ActorRef) error {
+func (s *Store) Unset(ctx context.Context, key string, scopeRef gate.ScopeRef, actor gate.ActorRef) error {
 	if s == nil || s.stateStore == nil {
 		domain := ""
 		if s != nil {
 			domain = s.domain
 		}
-		return storeRequiredError(key, scopeSet, "unset", domain)
+		return storeRequiredError(key, scopeRef, "unset", domain)
 	}
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
 	if normalized == "" {
-		return invalidKeyError(trimmed, normalized, scopeSet, "unset", s.domain)
+		return invalidKeyError(trimmed, normalized, scopeRef, "unset", s.domain)
 	}
 
-	ref, err := s.writeRef(scopeSet)
+	ref, err := s.writeRef(scopeRef)
 	if err != nil {
 		return err
 	}
@@ -220,52 +224,34 @@ func (s *Store) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, a
 	return nil
 }
 
-func (s *Store) writeRef(scopeSet gate.ScopeSet) (state.Ref, error) {
-	scopeDef := writeScope(scopeSet)
+func (s *Store) writeRef(scopeRef gate.ScopeRef) (state.Ref, error) {
+	scopeDef := s.scopes(scopeRef)
 	if scopeDef.Name == "" {
 		return state.Ref{}, ferrors.WrapSentinel(ferrors.ErrScopeRequired, "optionsadapter: scope is required", storeMeta(scopeDef, "write_ref", s.domain))
 	}
 	return state.Ref{Domain: s.domain, Scope: scopeDef}, nil
 }
 
-func defaultScopes(scopeSet gate.ScopeSet) []opts.Scope {
-	if scopeSet.System {
-		return []opts.Scope{scoped("system", "System", prioritySystem, "", "")}
-	}
-	var scopes []opts.Scope
-	if scopeSet.UserID != "" {
-		scopes = append(scopes, scoped("user", "User", priorityUser, scope.MetadataUserID, scopeSet.UserID))
-	}
-	if scopeSet.OrgID != "" {
-		scopes = append(scopes, scoped("org", "Org", priorityOrg, scope.MetadataOrgID, scopeSet.OrgID))
-	}
-	if scopeSet.TenantID != "" {
-		scopes = append(scopes, scoped("tenant", "Tenant", priorityTenant, scope.MetadataTenantID, scopeSet.TenantID))
-	}
-	scopes = append(scopes, scoped("system", "System", prioritySystem, "", ""))
-	return scopes
-}
-
-func writeScope(scopeSet gate.ScopeSet) opts.Scope {
-	switch {
-	case scopeSet.System:
-		return scoped("system", "System", prioritySystem, "", "")
-	case scopeSet.UserID != "":
-		return scoped("user", "User", priorityUser, scope.MetadataUserID, scopeSet.UserID)
-	case scopeSet.OrgID != "":
-		return scoped("org", "Org", priorityOrg, scope.MetadataOrgID, scopeSet.OrgID)
-	case scopeSet.TenantID != "":
-		return scoped("tenant", "Tenant", priorityTenant, scope.MetadataTenantID, scopeSet.TenantID)
+func defaultScopeFromRef(ref gate.ScopeRef) opts.Scope {
+	switch ref.Kind {
+	case gate.ScopeSystem:
+		return scoped("system", "System", prioritySystem, map[string]any{})
+	case gate.ScopeUser:
+		return scoped(scopeName("user", ref.ID), "User", priorityUser, scopeMetadata(ref, scope.MetadataUserID))
+	case gate.ScopeOrg:
+		return scoped(scopeName("org", ref.ID), "Org", priorityOrg, scopeMetadata(ref, scope.MetadataOrgID))
+	case gate.ScopeTenant:
+		return scoped(scopeName("tenant", ref.ID), "Tenant", priorityTenant, scopeMetadata(ref, scope.MetadataTenantID))
+	case gate.ScopeRole:
+		return scoped(scopeName("role", ref.ID), "Role", priorityRole, scopeMetadata(ref, metadataRoleID))
+	case gate.ScopePerm:
+		return scoped(scopeName("perm", ref.ID), "Perm", priorityPerm, scopeMetadata(ref, metadataPermID))
 	default:
-		return scoped("system", "System", prioritySystem, "", "")
+		return scoped("system", "System", prioritySystem, map[string]any{})
 	}
 }
 
-func scoped(name, label string, priority int, metadataKey, metadataValue string) opts.Scope {
-	var metadata map[string]any
-	if metadataKey != "" && metadataValue != "" {
-		metadata = map[string]any{metadataKey: metadataValue}
-	}
+func scoped(name, label string, priority int, metadata map[string]any) opts.Scope {
 	return opts.NewScope(
 		name,
 		priority,
@@ -317,26 +303,50 @@ func overrideFromValue(key string, value any, scopeDef opts.Scope, domain string
 
 var _ store.ReadWriter = (*Store)(nil)
 
-func storeRequiredError(key string, scopeSet gate.ScopeSet, operation, domain string) error {
+const (
+	metadataRoleID = "role_id"
+	metadataPermID = "perm_id"
+)
+
+func scopeName(kind, id string) string {
+	_ = id
+	return kind
+}
+
+func scopeMetadata(ref gate.ScopeRef, idKey string) map[string]any {
+	metadata := map[string]any{}
+	if idKey != "" && ref.ID != "" {
+		metadata[idKey] = ref.ID
+	}
+	if ref.TenantID != "" {
+		metadata[scope.MetadataTenantID] = ref.TenantID
+	}
+	if ref.OrgID != "" {
+		metadata[scope.MetadataOrgID] = ref.OrgID
+	}
+	return metadata
+}
+
+func storeRequiredError(key string, scopeRef gate.ScopeRef, operation, domain string) error {
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
 	return ferrors.WrapSentinel(ferrors.ErrStoreRequired, "optionsadapter: state store is required", map[string]any{
 		ferrors.MetaAdapter:              "options",
 		ferrors.MetaStore:                "state",
 		ferrors.MetaDomain:               strings.TrimSpace(domain),
-		ferrors.MetaScope:                scopeSet,
+		ferrors.MetaScope:                scopeRef,
 		ferrors.MetaOperation:            operation,
 		ferrors.MetaFeatureKey:           trimmed,
 		ferrors.MetaFeatureKeyNormalized: normalized,
 	})
 }
 
-func invalidKeyError(key, normalized string, scopeSet gate.ScopeSet, operation, domain string) error {
+func invalidKeyError(key, normalized string, scopeRef gate.ScopeRef, operation, domain string) error {
 	meta := map[string]any{
 		ferrors.MetaAdapter:              "options",
 		ferrors.MetaStore:                "state",
 		ferrors.MetaDomain:               strings.TrimSpace(domain),
-		ferrors.MetaScope:                scopeSet,
+		ferrors.MetaScope:                scopeRef,
 		ferrors.MetaOperation:            operation,
 		ferrors.MetaFeatureKey:           strings.TrimSpace(key),
 		ferrors.MetaFeatureKeyNormalized: normalized,
