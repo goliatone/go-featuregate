@@ -18,7 +18,7 @@ const (
 type UpdateEvent struct {
 	Key           string
 	NormalizedKey string
-	Scope         gate.ScopeSet
+	Scope         gate.ScopeRef
 	Actor         gate.ActorRef
 	Action        Action
 	Value         *bool
