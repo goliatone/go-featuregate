@@ -13,15 +13,17 @@ Scopes allow feature flags to have different values for different contexts:
 
 This enables progressive rollouts, tenant-specific features, and user-level customization.
 
-## ScopeSet Structure
+## ScopeRef and ScopeChain
 
 ```go
-type ScopeSet struct {
-    System   bool   // System-wide scope override (ignores tenant/org/user)
-    TenantID string // Tenant identifier
-    OrgID    string // Organization identifier
-    UserID   string // User identifier
+type ScopeRef struct {
+    Kind     ScopeKind
+    ID       string
+    TenantID string
+    OrgID    string
 }
+
+type ScopeChain []ScopeRef
 ```
 
 ## Scope Precedence
@@ -52,10 +54,12 @@ For system-wide features that apply globally:
 import "github.com/goliatone/go-featuregate/gate"
 
 // System-wide scope
-systemScope := gate.ScopeSet{System: true}
+systemChain := gate.ScopeChain{
+    {Kind: gate.ScopeSystem},
+}
 
 // Check system-level feature
-enabled, _ := featureGate.Enabled(ctx, "maintenance.mode", gate.WithScopeSet(systemScope))
+enabled, _ := featureGate.Enabled(ctx, "maintenance.mode", gate.WithScopeChain(systemChain))
 ```
 
 ### Tenant Scope
@@ -63,13 +67,17 @@ enabled, _ := featureGate.Enabled(ctx, "maintenance.mode", gate.WithScopeSet(sys
 For features scoped to a specific tenant:
 
 ```go
-tenantScope := gate.ScopeSet{TenantID: "acme-corp"}
+tenantScope := gate.ScopeRef{Kind: gate.ScopeTenant, ID: "acme-corp", TenantID: "acme-corp"}
+tenantChain := gate.ScopeChain{
+    tenantScope,
+    {Kind: gate.ScopeSystem},
+}
 
 // Enable feature for this tenant
 featureGate.Set(ctx, "beta.features", tenantScope, true, actor)
 
 // Check feature for this tenant
-enabled, _ := featureGate.Enabled(ctx, "beta.features", gate.WithScopeSet(tenantScope))
+enabled, _ := featureGate.Enabled(ctx, "beta.features", gate.WithScopeChain(tenantChain))
 ```
 
 ### Organization Scope
@@ -77,7 +85,9 @@ enabled, _ := featureGate.Enabled(ctx, "beta.features", gate.WithScopeSet(tenant
 For features scoped to an organization within a tenant:
 
 ```go
-orgScope := gate.ScopeSet{
+orgScope := gate.ScopeRef{
+    Kind:     gate.ScopeOrg,
+    ID:       "engineering",
     TenantID: "acme-corp",
     OrgID:    "engineering",
 }
@@ -86,15 +96,30 @@ orgScope := gate.ScopeSet{
 featureGate.Set(ctx, "advanced.tools", orgScope, true, actor)
 ```
 
+Org-only scopes are supported when tenant information is not available:
+
+```go
+orgOnlyScope := gate.ScopeRef{
+    Kind: gate.ScopeOrg,
+    ID:   "engineering",
+    OrgID: "engineering",
+}
+
+featureGate.Set(ctx, "advanced.tools", orgOnlyScope, true, actor)
+```
+
+Org-only overrides match only org-only checks (no implicit tenant wildcarding).
+
 ### User Scope
 
 For user-specific feature flags:
 
 ```go
-userScope := gate.ScopeSet{
+userScope := gate.ScopeRef{
+    Kind:     gate.ScopeUser,
+    ID:       "user-123",
     TenantID: "acme-corp",
     OrgID:    "engineering",
-    UserID:   "user-123",
 }
 
 // Enable feature for specific user (beta tester)
@@ -119,11 +144,11 @@ ctx = scope.WithTenantID(ctx, "acme-corp")
 ctx = scope.WithOrgID(ctx, "engineering")
 ctx = scope.WithUserID(ctx, "user-123")
 
-// Extract scope from context
-scopeSet := scope.FromContext(ctx)
-// scopeSet.TenantID == "acme-corp"
-// scopeSet.OrgID == "engineering"
-// scopeSet.UserID == "user-123"
+// Extract claims from context
+claims := scope.ClaimsFromContext(ctx)
+// claims.TenantID == "acme-corp"
+// claims.OrgID == "engineering"
+// claims.SubjectID == "user-123"
 ```
 
 `scope.WithTenantID`, `scope.WithOrgID`, and `scope.WithUserID` ignore empty or
@@ -154,50 +179,48 @@ When you don't pass an explicit scope, the gate derives it from context:
 // Middleware sets scope in context
 ctx = scope.WithTenantID(ctx, "acme-corp")
 
-// Gate automatically uses scope from context
+// Gate automatically uses claims from context
 enabled, _ := featureGate.Enabled(ctx, "feature.key")
-// Equivalent to:
-// featureGate.Enabled(ctx, "feature.key", gate.WithScopeSet(scope.FromContext(ctx)))
 ```
 
 ## Explicit Scope Override
 
-Override context-derived scope with `gate.WithScopeSet`:
+Override context-derived scope with `gate.WithScopeChain`:
 
 ```go
 // Context has tenant scope
 ctx = scope.WithTenantID(ctx, "acme-corp")
 
 // Override with system scope for this specific check
-systemScope := gate.ScopeSet{System: true}
-enabled, _ := featureGate.Enabled(ctx, "global.setting", gate.WithScopeSet(systemScope))
+systemChain := gate.ScopeChain{{Kind: gate.ScopeSystem}}
+enabled, _ := featureGate.Enabled(ctx, "global.setting", gate.WithScopeChain(systemChain))
 ```
 
 ## Custom Scope Resolvers
 
-Implement `gate.ScopeResolver` for custom scope derivation:
+Implement `gate.ClaimsProvider` for custom claims derivation:
 
 ```go
-type ScopeResolver interface {
-    Resolve(ctx context.Context) (ScopeSet, error)
+type ClaimsProvider interface {
+    ClaimsFromContext(ctx context.Context) (gate.ActorClaims, error)
 }
 ```
 
 ### Example: JWT Claims Resolver
 
 ```go
-type JWTScopeResolver struct{}
+type JWTClaimsProvider struct{}
 
-func (r *JWTScopeResolver) Resolve(ctx context.Context) (gate.ScopeSet, error) {
+func (r *JWTClaimsProvider) ClaimsFromContext(ctx context.Context) (gate.ActorClaims, error) {
     claims, ok := ctx.Value("jwt_claims").(map[string]any)
     if !ok {
-        return gate.ScopeSet{}, nil
+        return gate.ActorClaims{}, nil
     }
 
-    return gate.ScopeSet{
-        TenantID: getString(claims, "tenant_id"),
-        OrgID:    getString(claims, "org_id"),
-        UserID:   getString(claims, "sub"),
+    return gate.ActorClaims{
+        TenantID:  getString(claims, "tenant_id"),
+        OrgID:     getString(claims, "org_id"),
+        SubjectID: getString(claims, "sub"),
     }, nil
 }
 
@@ -211,7 +234,7 @@ func getString(m map[string]any, key string) string {
 // Use custom resolver
 featureGate := resolver.New(
     resolver.WithDefaults(defaults),
-    resolver.WithScopeResolver(&JWTScopeResolver{}),
+    resolver.WithClaimsProvider(&JWTClaimsProvider{}),
 )
 ```
 
@@ -222,11 +245,11 @@ The go-auth adapter provides scope resolution from authentication context:
 ```go
 import "github.com/goliatone/go-auth/adapters/featuregate"
 
-scopeResolver := featuregate.NewScopeResolver()
+claimsProvider := featuregate.NewClaimsProvider()
 
 featureGate := resolver.New(
     resolver.WithDefaults(defaults),
-    resolver.WithScopeResolver(scopeResolver),
+    resolver.WithClaimsProvider(claimsProvider),
 )
 ```
 
@@ -274,15 +297,15 @@ Roll out features gradually across tenants:
 
 ```go
 // Phase 1: Enable for internal tenant
-featureGate.Set(ctx, "new.checkout", gate.ScopeSet{TenantID: "internal"}, true, actor)
+featureGate.Set(ctx, "new.checkout", gate.ScopeRef{Kind: gate.ScopeTenant, ID: "internal", TenantID: "internal"}, true, actor)
 
 // Phase 2: Enable for beta tenants
 for _, tenantID := range betaTenants {
-    featureGate.Set(ctx, "new.checkout", gate.ScopeSet{TenantID: tenantID}, true, actor)
+    featureGate.Set(ctx, "new.checkout", gate.ScopeRef{Kind: gate.ScopeTenant, ID: tenantID, TenantID: tenantID}, true, actor)
 }
 
 // Phase 3: Enable system-wide (or change default)
-featureGate.Set(ctx, "new.checkout", gate.ScopeSet{System: true}, true, actor)
+featureGate.Set(ctx, "new.checkout", gate.ScopeRef{Kind: gate.ScopeSystem}, true, actor)
 ```
 
 ### Beta User Testing
@@ -294,7 +317,7 @@ func enableBetaFeature(ctx context.Context, featureKey string, userIDs []string)
     actor := gate.ActorRef{ID: "system", Type: "automation"}
 
     for _, userID := range userIDs {
-        scope := gate.ScopeSet{UserID: userID}
+        scope := gate.ScopeRef{Kind: gate.ScopeUser, ID: userID}
         if err := featureGate.Set(ctx, featureKey, scope, true, actor); err != nil {
             return err
         }
@@ -335,7 +358,7 @@ func emergencyDisable(ctx context.Context, featureKey string) error {
     }
 
     // System-wide disable overrides all tenant/user settings
-    return featureGate.Set(ctx, featureKey, gate.ScopeSet{System: true}, false, actor)
+    return featureGate.Set(ctx, featureKey, gate.ScopeRef{Kind: gate.ScopeSystem}, false, actor)
 }
 ```
 
@@ -380,16 +403,18 @@ func TestFeatureByScope(t *testing.T) {
     actor := gate.ActorRef{ID: "test"}
 
     // Enable for tenant A
-    tenantA := gate.ScopeSet{TenantID: "tenant-a"}
+    tenantA := gate.ScopeRef{Kind: gate.ScopeTenant, ID: "tenant-a", TenantID: "tenant-a"}
+    tenantAChain := gate.ScopeChain{tenantA, {Kind: gate.ScopeSystem}}
     featureGate.Set(ctx, "feature", tenantA, true, actor)
 
     // Test tenant A - enabled
-    enabled, _ := featureGate.Enabled(ctx, "feature", gate.WithScopeSet(tenantA))
+    enabled, _ := featureGate.Enabled(ctx, "feature", gate.WithScopeChain(tenantAChain))
     assert.True(t, enabled)
 
     // Test tenant B - falls back to default (false)
-    tenantB := gate.ScopeSet{TenantID: "tenant-b"}
-    enabled, _ = featureGate.Enabled(ctx, "feature", gate.WithScopeSet(tenantB))
+    tenantB := gate.ScopeRef{Kind: gate.ScopeTenant, ID: "tenant-b", TenantID: "tenant-b"}
+    tenantBChain := gate.ScopeChain{tenantB, {Kind: gate.ScopeSystem}}
+    enabled, _ = featureGate.Enabled(ctx, "feature", gate.WithScopeChain(tenantBChain))
     assert.False(t, enabled)
 }
 ```
@@ -407,26 +432,28 @@ func TestScopePrecedence(t *testing.T) {
     actor := gate.ActorRef{ID: "test"}
 
     // System: enabled
-    featureGate.Set(ctx, "feature", gate.ScopeSet{System: true}, true, actor)
+    featureGate.Set(ctx, "feature", gate.ScopeRef{Kind: gate.ScopeSystem}, true, actor)
 
     // Tenant: disabled (overrides system)
-    tenantScope := gate.ScopeSet{TenantID: "acme"}
+    tenantScope := gate.ScopeRef{Kind: gate.ScopeTenant, ID: "acme", TenantID: "acme"}
+    tenantChain := gate.ScopeChain{tenantScope, {Kind: gate.ScopeSystem}}
     featureGate.Set(ctx, "feature", tenantScope, false, actor)
 
     // User: enabled (overrides tenant)
-    userScope := gate.ScopeSet{TenantID: "acme", UserID: "beta-user"}
+    userScope := gate.ScopeRef{Kind: gate.ScopeUser, ID: "beta-user", TenantID: "acme"}
+    userChain := gate.ScopeChain{userScope, tenantScope, {Kind: gate.ScopeSystem}}
     featureGate.Set(ctx, "feature", userScope, true, actor)
 
     // System scope: true
-    enabled, _ := featureGate.Enabled(ctx, "feature", gate.WithScopeSet(gate.ScopeSet{System: true}))
+    enabled, _ := featureGate.Enabled(ctx, "feature", gate.WithScopeChain(gate.ScopeChain{{Kind: gate.ScopeSystem}}))
     assert.True(t, enabled)
 
     // Tenant scope: false
-    enabled, _ = featureGate.Enabled(ctx, "feature", gate.WithScopeSet(tenantScope))
+    enabled, _ = featureGate.Enabled(ctx, "feature", gate.WithScopeChain(tenantChain))
     assert.False(t, enabled)
 
     // User scope: true
-    enabled, _ = featureGate.Enabled(ctx, "feature", gate.WithScopeSet(userScope))
+    enabled, _ = featureGate.Enabled(ctx, "feature", gate.WithScopeChain(userChain))
     assert.True(t, enabled)
 }
 ```
@@ -437,19 +464,19 @@ func TestScopePrecedence(t *testing.T) {
 
 ```go
 // Good: explicit scope
-featureGate.Set(ctx, "feature", gate.ScopeSet{TenantID: "acme"}, true, actor)
+featureGate.Set(ctx, "feature", gate.ScopeRef{Kind: gate.ScopeTenant, ID: "acme", TenantID: "acme"}, true, actor)
 
-// Avoid: relying on context scope for mutations
-// scopeSet := scope.FromContext(ctx)
-// featureGate.Set(ctx, "feature", scopeSet, true, actor)
+// Avoid: relying on context claims for mutations
+// claims := scope.ClaimsFromContext(ctx)
+// _ = claims
 ```
 
 ### 2. Use System Scope for Boot/Test Flows
 
 ```go
 // During application bootstrap
-systemScope := gate.ScopeSet{System: true}
-if enabled, _ := featureGate.Enabled(ctx, "feature", gate.WithScopeSet(systemScope)); enabled {
+systemChain := gate.ScopeChain{{Kind: gate.ScopeSystem}}
+if enabled, _ := featureGate.Enabled(ctx, "feature", gate.WithScopeChain(systemChain)); enabled {
     // Initialize feature
 }
 ```
@@ -460,11 +487,15 @@ if enabled, _ := featureGate.Enabled(ctx, "feature", gate.WithScopeSet(systemSco
 // checkDashboard requires tenant scope in context.
 // Returns false if no tenant scope is present.
 func checkDashboard(ctx context.Context) bool {
-    scopeSet := scope.FromContext(ctx)
-    if scopeSet.TenantID == "" {
+    claims := scope.ClaimsFromContext(ctx)
+    if claims.TenantID == "" {
         return false
     }
-    enabled, _ := featureGate.Enabled(ctx, "dashboard", gate.WithScopeSet(scopeSet))
+    chain := gate.ScopeChain{
+        {Kind: gate.ScopeTenant, ID: claims.TenantID, TenantID: claims.TenantID},
+        {Kind: gate.ScopeSystem},
+    }
+    enabled, _ := featureGate.Enabled(ctx, "dashboard", gate.WithScopeChain(chain))
     return enabled
 }
 ```
@@ -477,7 +508,7 @@ func EnableFeatureForTenant(ctx context.Context, tenantID, featureKey string) er
         return errors.New("tenant ID required")
     }
 
-    scope := gate.ScopeSet{TenantID: tenantID}
+    scope := gate.ScopeRef{Kind: gate.ScopeTenant, ID: tenantID, TenantID: tenantID}
     return featureGate.Set(ctx, featureKey, scope, true, getActor(ctx))
 }
 ```

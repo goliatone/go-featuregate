@@ -27,6 +27,28 @@ When you call `Enabled()` or `ResolveWithTrace()`, the gate checks sources in a 
 └─────────────────────────────────────────────────────────────┘
 ```
 
+## RBAC Strategy Overrides (refactor)
+
+The RBAC refactor introduces chain-based resolution with a strategy hook that
+can override precedence and conflict rules:
+
+```go
+type ResolveStrategy func(
+    ctx context.Context,
+    key string,
+    chain ScopeChain,
+    matches []OverrideMatch,
+    opts ResolveOptions,
+) (OverrideDecision, ResolveTrace, error)
+```
+
+Default conflict policy:
+
+- Order is user -> role+perm -> org -> tenant -> system.
+- Deny-wins applies only within the role/perm group.
+- Earlier groups are not overridden by later groups unless a custom strategy
+  is supplied.
+
 ### Source Priority
 
 | Priority | Source | Description |
@@ -194,6 +216,12 @@ aliases := gate.AliasesFor("users.signup")
 
 **Note**: Legacy aliases are currently disabled in the default configuration.
 
+Alias resolution order:
+
+- Normalize the key and attempt override lookup.
+- If missing, attempt lookup for aliases in order.
+- Defaults and fallback apply after override resolution.
+
 ### Standard Feature Keys
 
 Common feature keys used across the ecosystem:
@@ -251,7 +279,7 @@ enabled, err := gate.Enabled(ctx, "feature")
 Use `ResolveWithTrace` to debug resolution:
 
 ```go
-enabled, trace, err := gate.ResolveWithTrace(ctx, "dashboard", gate.WithScopeSet(scope))
+enabled, trace, err := gate.ResolveWithTrace(ctx, "dashboard", gate.WithScopeChain(scope))
 if err != nil {
     log.Fatal(err)
 }
@@ -282,7 +310,7 @@ fmt.Printf("Default Value: %v\n", trace.Default.Value)
 type ResolveTrace struct {
     Key           string        // Original key
     NormalizedKey string        // After normalization
-    Scope         ScopeSet      // Resolution scope
+    Chain         ScopeChain    // Resolution scope chain
     Value         bool          // Final resolved value
     Source        ResolveSource // Where value came from
     Override      OverrideTrace // Override resolution details
@@ -395,7 +423,7 @@ Pass scopes explicitly rather than relying on context extraction:
 
 ```go
 // Preferred: explicit scope
-enabled, _ := gate.Enabled(ctx, "feature", gate.WithScopeSet(scope))
+enabled, _ := gate.Enabled(ctx, "feature", gate.WithScopeChain(scope))
 
 // Implicit: derived from context
 enabled, _ := gate.Enabled(ctx, "feature")
@@ -406,7 +434,7 @@ enabled, _ := gate.Enabled(ctx, "feature")
 When features behave unexpectedly, use `ResolveWithTrace`:
 
 ```go
-_, trace, _ := gate.ResolveWithTrace(ctx, "problem.feature", gate.WithScopeSet(scope))
+_, trace, _ := gate.ResolveWithTrace(ctx, "problem.feature", gate.WithScopeChain(scope))
 fmt.Printf("Debug: %+v\n", trace)
 ```
 
