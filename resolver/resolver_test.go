@@ -22,27 +22,33 @@ func (d staticDefaults) Default(_ context.Context, key string) (DefaultResult, e
 }
 
 type stubStore struct {
-	overrides  map[string]store.Override
-	getErr     error
-	setErr     error
-	unsetErr   error
-	getCalls   []string
-	setCalls   []string
-	unsetCalls []string
+	overrides    map[string]store.Override
+	getErr       error
+	setErr       error
+	unsetErr     error
+	getCalls     []string
+	setCalls     []string
+	unsetCalls   []string
+	lastChainLen int
 }
 
-func (s *stubStore) Get(_ context.Context, key string, _ gate.ScopeSet) (store.Override, error) {
+func (s *stubStore) GetAll(_ context.Context, key string, chain gate.ScopeChain) ([]store.OverrideMatch, error) {
 	s.getCalls = append(s.getCalls, key)
+	s.lastChainLen = len(chain)
 	if s.getErr != nil {
-		return store.MissingOverride(), s.getErr
+		return nil, s.getErr
 	}
 	if override, ok := s.overrides[key]; ok {
-		return override, nil
+		ref := gate.ScopeRef{Kind: gate.ScopeSystem}
+		if len(chain) > 0 {
+			ref = chain[0]
+		}
+		return []store.OverrideMatch{{Scope: ref, Override: override}}, nil
 	}
-	return store.MissingOverride(), nil
+	return nil, nil
 }
 
-func (s *stubStore) Set(_ context.Context, key string, _ gate.ScopeSet, _ bool, _ gate.ActorRef) error {
+func (s *stubStore) Set(_ context.Context, key string, _ gate.ScopeRef, _ bool, _ gate.ActorRef) error {
 	s.setCalls = append(s.setCalls, key)
 	if s.setErr != nil {
 		return s.setErr
@@ -50,7 +56,7 @@ func (s *stubStore) Set(_ context.Context, key string, _ gate.ScopeSet, _ bool, 
 	return nil
 }
 
-func (s *stubStore) Unset(_ context.Context, key string, _ gate.ScopeSet, _ gate.ActorRef) error {
+func (s *stubStore) Unset(_ context.Context, key string, _ gate.ScopeRef, _ gate.ActorRef) error {
 	s.unsetCalls = append(s.unsetCalls, key)
 	if s.unsetErr != nil {
 		return s.unsetErr
@@ -114,7 +120,11 @@ func TestGateStrictStoreReturnsError(t *testing.T) {
 		WithStrictStore(true),
 	)
 
-	_, err := g.Enabled(ctx, "users.signup", gate.WithScopeSet(gate.ScopeSet{TenantID: "tenant-1"}))
+	chain := gate.ScopeChain{
+		{Kind: gate.ScopeTenant, ID: "tenant-1", TenantID: "tenant-1"},
+		{Kind: gate.ScopeSystem},
+	}
+	_, err := g.Enabled(ctx, "users.signup", gate.WithScopeChain(chain))
 	if err == nil {
 		t.Fatalf("expected strict store error")
 	}
@@ -165,7 +175,7 @@ func TestGateUnsetDoesNotClearLegacyAliases(t *testing.T) {
 	storeStub := &stubStore{}
 	g := New(WithOverrideWriter(storeStub))
 
-	if err := g.Unset(ctx, "users.signup", gate.ScopeSet{TenantID: "tenant-1"}, gate.ActorRef{ID: "actor"}); err != nil {
+	if err := g.Unset(ctx, "users.signup", gate.ScopeRef{Kind: gate.ScopeTenant, ID: "tenant-1", TenantID: "tenant-1"}, gate.ActorRef{ID: "actor"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(storeStub.unsetCalls) != 1 {

@@ -3,8 +3,6 @@ package scope
 import (
 	"context"
 	"testing"
-
-	"github.com/goliatone/go-featuregate/gate"
 )
 
 func TestScopeHelpersNoopAndClear(t *testing.T) {
@@ -52,24 +50,23 @@ func TestScopeHelpersNoopAndClear(t *testing.T) {
 	}
 }
 
-func TestFromContextSystemOverride(t *testing.T) {
+func TestClaimsFromContext(t *testing.T) {
 	ctx := context.Background()
 	ctx = WithTenantID(ctx, "acme")
 	ctx = WithOrgID(ctx, "engineering")
 	ctx = WithUserID(ctx, "user-123")
 	ctx = WithSystem(ctx, true)
 
-	got := FromContext(ctx)
-	want := gate.ScopeSet{System: true}
-	if got != want {
-		t.Fatalf("FromContext() = %+v, want %+v", got, want)
+	got := ClaimsFromContext(ctx)
+	if got.SubjectID != "user-123" || got.TenantID != "acme" || got.OrgID != "engineering" {
+		t.Fatalf("ClaimsFromContext() = %+v, want subject/tenant/org", got)
 	}
 }
 
-func TestFromContextNil(t *testing.T) {
+func TestClaimsFromContextNil(t *testing.T) {
 	var ctx context.Context
-	got := FromContext(ctx)
-	if got != (gate.ScopeSet{}) {
-		t.Fatalf("FromContext(nil) = %+v, want empty ScopeSet", got)
+	got := ClaimsFromContext(ctx)
+	if got.SubjectID != "" || got.TenantID != "" || got.OrgID != "" || len(got.Roles) != 0 || len(got.Perms) != 0 {
+		t.Fatalf("ClaimsFromContext(nil) = %+v, want empty claims", got)
 	}
 }

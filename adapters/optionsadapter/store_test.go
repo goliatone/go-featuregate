@@ -5,7 +5,6 @@ import (
 	"sync"
 	"testing"
 
-	opts "github.com/goliatone/go-options"
 	"github.com/goliatone/go-options/pkg/state"
 
 	"github.com/goliatone/go-featuregate/gate"
@@ -77,8 +76,8 @@ func TestStoreSetWritesUserScopeMetadata(t *testing.T) {
 	stateStore := newMemoryStateStore()
 	store := NewStore(stateStore)
 
-	scopeSet := gate.ScopeSet{UserID: "user-1"}
-	if err := store.Set(ctx, "users.signup", scopeSet, true, gate.ActorRef{}); err != nil {
+	scopeRef := gate.ScopeRef{Kind: gate.ScopeUser, ID: "user-1"}
+	if err := store.Set(ctx, "users.signup", scopeRef, true, gate.ActorRef{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -91,17 +90,15 @@ func TestStoreSetWritesUserScopeMetadata(t *testing.T) {
 	}
 }
 
-func TestStoreGetRespectsScopePrecedence(t *testing.T) {
+func TestStoreGetAllReturnsMatchesByChain(t *testing.T) {
 	ctx := context.Background()
 	stateStore := newMemoryStateStore()
 	store := NewStore(stateStore)
 
-	tenantScope := opts.NewScope("tenant", 20, opts.WithScopeMetadata(map[string]any{
-		scope.MetadataTenantID: "tenant-1",
-	}))
-	userScope := opts.NewScope("user", 40, opts.WithScopeMetadata(map[string]any{
-		scope.MetadataUserID: "user-1",
-	}))
+	tenantRef := gate.ScopeRef{Kind: gate.ScopeTenant, ID: "tenant-1", TenantID: "tenant-1"}
+	userRef := gate.ScopeRef{Kind: gate.ScopeUser, ID: "user-1", TenantID: "tenant-1"}
+	tenantScope := store.scopes(tenantRef)
+	userScope := store.scopes(userRef)
 
 	if err := stateStore.seed(state.Ref{Domain: DefaultDomain, Scope: tenantScope}, map[string]any{
 		"users.signup": true,
@@ -114,14 +111,19 @@ func TestStoreGetRespectsScopePrecedence(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	override, err := store.Get(ctx, "users.signup", gate.ScopeSet{
-		TenantID: "tenant-1",
-		UserID:   "user-1",
-	})
+	chain := gate.ScopeChain{
+		userRef,
+		tenantRef,
+		{Kind: gate.ScopeSystem},
+	}
+	matches, err := store.GetAll(ctx, "users.signup", chain)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if override.State != gate.OverrideStateDisabled {
-		t.Fatalf("expected user override to win, got %q", override.State)
+	if len(matches) != 2 {
+		t.Fatalf("expected 2 matches, got %d", len(matches))
+	}
+	if matches[0].Scope.Kind != gate.ScopeUser {
+		t.Fatalf("expected user match first, got %v", matches[0].Scope.Kind)
 	}
 }

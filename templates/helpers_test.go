@@ -19,7 +19,7 @@ type captureGate struct {
 	err       error
 	calls     int
 	lastKey   string
-	lastScope *gate.ScopeSet
+	lastChain *gate.ScopeChain
 	lastCtx   context.Context
 }
 
@@ -33,11 +33,11 @@ func (g *captureGate) Enabled(ctx context.Context, key string, opts ...gate.Reso
 			opt(&req)
 		}
 	}
-	if req.ScopeSet != nil {
-		scopeCopy := *req.ScopeSet
-		g.lastScope = &scopeCopy
+	if req.ScopeChain != nil {
+		chainCopy := append(gate.ScopeChain(nil), (*req.ScopeChain)...)
+		g.lastChain = &chainCopy
 	} else {
-		g.lastScope = nil
+		g.lastChain = nil
 	}
 	return g.value, g.err
 }
@@ -63,7 +63,7 @@ func TestTemplateHelpersScopeOverride(t *testing.T) {
 	if !value {
 		t.Fatalf("expected feature helper to return true")
 	}
-	if gateStub.lastScope == nil || gateStub.lastScope.UserID != "user-1" {
+	if gateStub.lastChain == nil || len(*gateStub.lastChain) == 0 || (*gateStub.lastChain)[0].ID != "user-1" {
 		t.Fatalf("expected scope override to be applied")
 	}
 }
