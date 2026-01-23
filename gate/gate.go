@@ -2,27 +2,46 @@ package gate
 
 import "context"
 
-// ScopeSet captures the resolution scope for a feature check.
-type ScopeSet struct {
-	System   bool
+// ScopeKind defines supported scope types.
+type ScopeKind uint8
+
+const (
+	ScopeSystem ScopeKind = iota
+	ScopeTenant
+	ScopeOrg
+	ScopeUser
+	ScopeRole
+	ScopePerm
+)
+
+// ScopeRef identifies a single scope target.
+type ScopeRef struct {
+	Kind     ScopeKind
+	ID       string
 	TenantID string
 	OrgID    string
-	UserID   string
 }
 
-// NormalizeScopeSet ensures system scope ignores tenant/org/user IDs.
-func NormalizeScopeSet(scopeSet ScopeSet) ScopeSet {
-	if scopeSet.System {
-		scopeSet.TenantID = ""
-		scopeSet.OrgID = ""
-		scopeSet.UserID = ""
-	}
-	return scopeSet
+// ScopeChain is an ordered list of scope references.
+type ScopeChain []ScopeRef
+
+// ActorClaims are the minimal inputs required to build a chain.
+type ActorClaims struct {
+	SubjectID string
+	TenantID  string
+	OrgID     string
+	Roles     []string
+	Perms     []string
 }
 
-// ScopeResolver derives a ScopeSet from context.
-type ScopeResolver interface {
-	Resolve(ctx context.Context) (ScopeSet, error)
+// ClaimsProvider derives claims from context.
+type ClaimsProvider interface {
+	ClaimsFromContext(ctx context.Context) (ActorClaims, error)
+}
+
+// PermissionProvider derives permissions from claims/roles.
+type PermissionProvider interface {
+	Permissions(ctx context.Context, claims ActorClaims) ([]string, error)
 }
 
 // ResolveOption mutates a resolve request.
@@ -30,16 +49,16 @@ type ResolveOption func(*ResolveRequest)
 
 // ResolveRequest captures optional inputs for a resolve call.
 type ResolveRequest struct {
-	ScopeSet *ScopeSet
+	ScopeChain *ScopeChain
 }
 
-// WithScopeSet forces a specific scope instead of deriving it from context.
-func WithScopeSet(s ScopeSet) ResolveOption {
+// WithScopeChain forces a specific scope chain instead of deriving it from context.
+func WithScopeChain(chain ScopeChain) ResolveOption {
 	return func(req *ResolveRequest) {
 		if req == nil {
 			return
 		}
-		req.ScopeSet = &s
+		req.ScopeChain = &chain
 	}
 }
 
@@ -57,8 +76,8 @@ type TraceableFeatureGate interface {
 // MutableFeatureGate supports runtime overrides for feature values.
 type MutableFeatureGate interface {
 	FeatureGate
-	Set(ctx context.Context, key string, scope ScopeSet, enabled bool, actor ActorRef) error
-	Unset(ctx context.Context, key string, scope ScopeSet, actor ActorRef) error
+	Set(ctx context.Context, key string, scope ScopeRef, enabled bool, actor ActorRef) error
+	Unset(ctx context.Context, key string, scope ScopeRef, actor ActorRef) error
 }
 
 // ActorRef identifies the actor making a change to runtime overrides.
