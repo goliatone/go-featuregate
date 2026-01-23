@@ -17,6 +17,8 @@ go-featuregate provides feature flag management with:
 go get github.com/goliatone/go-featuregate
 ```
 
+Requires Go 1.24+.
+
 ## Quick Start
 
 ### 1. Config Defaults Only
@@ -29,13 +31,14 @@ package main
 import (
     "context"
     "fmt"
+    "log"
 
     "github.com/goliatone/go-featuregate/adapters/configadapter"
     "github.com/goliatone/go-featuregate/resolver"
 )
 
 func main() {
-    // Define feature defaults as a nested map
+    // Define feature defaults as a flat map of dot-delimited keys.
     defaults := configadapter.NewDefaultsFromBools(map[string]bool{
         "users.signup":    true,
         "dashboard":       false,
@@ -50,11 +53,19 @@ func main() {
     // Check feature enablement
     ctx := context.Background()
 
-    if enabled, _ := gate.Enabled(ctx, "users.signup"); enabled {
+    enabled, err := gate.Enabled(ctx, "users.signup")
+    if err != nil {
+        log.Fatal(err)
+    }
+    if enabled {
         fmt.Println("User signup is enabled")
     }
 
-    if enabled, _ := gate.Enabled(ctx, "dashboard"); enabled {
+    enabled, err = gate.Enabled(ctx, "dashboard")
+    if err != nil {
+        log.Fatal(err)
+    }
+    if enabled {
         fmt.Println("Dashboard is enabled")
     } else {
         fmt.Println("Dashboard is disabled")
@@ -78,6 +89,7 @@ package main
 import (
     "context"
     "fmt"
+    "log"
 
     "github.com/goliatone/go-featuregate/adapters/configadapter"
     "github.com/goliatone/go-featuregate/gate"
@@ -103,19 +115,32 @@ func main() {
     actor := gate.ActorRef{ID: "admin-1", Type: "user", Name: "Admin"}
 
     // Check default value
-    enabled, _ := featureGate.Enabled(ctx, "beta.features", gate.WithScopeSet(scope))
+    enabled, err := featureGate.Enabled(ctx, "beta.features", gate.WithScopeSet(scope))
+    if err != nil {
+        log.Fatal(err)
+    }
     fmt.Printf("beta.features (default): %v\n", enabled)
 
     // Enable at runtime for this tenant
-    featureGate.Set(ctx, "beta.features", scope, true, actor)
+    if err := featureGate.Set(ctx, "beta.features", scope, true, actor); err != nil {
+        log.Fatal(err)
+    }
 
-    enabled, _ = featureGate.Enabled(ctx, "beta.features", gate.WithScopeSet(scope))
+    enabled, err = featureGate.Enabled(ctx, "beta.features", gate.WithScopeSet(scope))
+    if err != nil {
+        log.Fatal(err)
+    }
     fmt.Printf("beta.features (override): %v\n", enabled)
 
     // Revert to default
-    featureGate.Unset(ctx, "beta.features", scope, actor)
+    if err := featureGate.Unset(ctx, "beta.features", scope, actor); err != nil {
+        log.Fatal(err)
+    }
 
-    enabled, _ = featureGate.Enabled(ctx, "beta.features", gate.WithScopeSet(scope))
+    enabled, err = featureGate.Enabled(ctx, "beta.features", gate.WithScopeSet(scope))
+    if err != nil {
+        log.Fatal(err)
+    }
     fmt.Printf("beta.features (unset): %v\n", enabled)
 }
 ```
@@ -140,7 +165,8 @@ Feature keys are dot-separated strings that identify features:
 "beta.new_editor"        // Beta new editor feature
 ```
 
-Keys are normalized to lowercase. Use `gate.NormalizeKey()` for consistency.
+Keys are trimmed and aliases are resolved (if configured). Use lowercase dot-delimited
+keys by convention, and call `gate.NormalizeKey()` for consistency.
 
 ### Resolution Order
 
@@ -190,12 +216,16 @@ featureGate.Set(ctx, "feature.key", scope, true, actor)
 
 ## Configuration Options
 
+The snippets in this section assume the defaults and override store setup from the
+Quick Start examples (including `featureGate`, `ctx`, `scope`, and imports), and
+focus on the specific option being added.
+
 ### Strict Store Mode
 
 By default, store errors fail open (feature returns default/false). Enable strict mode to fail closed:
 
 ```go
-gate := resolver.New(
+featureGate := resolver.New(
     resolver.WithDefaults(defaults),
     resolver.WithOverrideStore(overrides),
     resolver.WithStrictStore(true), // Errors propagate instead of falling back
@@ -207,7 +237,7 @@ gate := resolver.New(
 Add a cache to reduce store lookups:
 
 ```go
-gate := resolver.New(
+featureGate := resolver.New(
     resolver.WithDefaults(defaults),
     resolver.WithOverrideStore(overrides),
     resolver.WithCache(myCache), // Implements cache.Cache interface
@@ -219,7 +249,7 @@ gate := resolver.New(
 Subscribe to resolution and update events:
 
 ```go
-gate := resolver.New(
+featureGate := resolver.New(
     resolver.WithDefaults(defaults),
     resolver.WithResolveHook(gate.ResolveHookFunc(func(ctx context.Context, event gate.ResolveEvent) {
         log.Printf("Resolved %s = %v (source: %s)", event.Key, event.Value, event.Source)
