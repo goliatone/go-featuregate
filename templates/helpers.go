@@ -281,8 +281,8 @@ func (h *helperSet) resolveValue(execCtx *pongo2.ExecutionContext, key string) (
 }
 
 func (h *helperSet) resolveOptions(execCtx *pongo2.ExecutionContext) []gate.ResolveOption {
-	if scopeSet := h.scope(execCtx); scopeSet != nil {
-		return []gate.ResolveOption{gate.WithScopeSet(*scopeSet)}
+	if chain := h.scope(execCtx); chain != nil {
+		return []gate.ResolveOption{gate.WithScopeChain(*chain)}
 	}
 	return nil
 }
@@ -303,7 +303,7 @@ func (h *helperSet) context(execCtx *pongo2.ExecutionContext) context.Context {
 	return contextFromValue(raw)
 }
 
-func (h *helperSet) scope(execCtx *pongo2.ExecutionContext) *gate.ScopeSet {
+func (h *helperSet) scope(execCtx *pongo2.ExecutionContext) *gate.ScopeChain {
 	data := templateData(execCtx)
 	if data == nil {
 		return nil
@@ -316,11 +316,11 @@ func (h *helperSet) scope(execCtx *pongo2.ExecutionContext) *gate.ScopeSet {
 	if !ok || raw == nil {
 		return nil
 	}
-	scopeSet, ok := scopeFromValue(raw)
+	chain, ok := scopeFromValue(raw)
 	if !ok {
 		return nil
 	}
-	return &scopeSet
+	return &chain
 }
 
 func (h *helperSet) snapshot(execCtx *pongo2.ExecutionContext) any {
@@ -567,15 +567,19 @@ func contextFromValue(value any) context.Context {
 	}
 }
 
-func scopeFromValue(value any) (gate.ScopeSet, bool) {
+func scopeFromValue(value any) (gate.ScopeChain, bool) {
 	switch typed := value.(type) {
-	case gate.ScopeSet:
+	case gate.ScopeChain:
 		return typed, true
-	case *gate.ScopeSet:
+	case *gate.ScopeChain:
 		if typed == nil {
-			return gate.ScopeSet{}, false
+			return nil, false
 		}
 		return *typed, true
+	case []gate.ScopeRef:
+		return gate.ScopeChain(typed), true
+	case gate.ScopeRef:
+		return gate.ScopeChain{typed}, true
 	case map[string]any:
 		return scopeFromMap(typed)
 	case map[string]string:
@@ -585,33 +589,50 @@ func scopeFromValue(value any) (gate.ScopeSet, bool) {
 		}
 		return scopeFromMap(raw)
 	default:
-		return gate.ScopeSet{}, false
+		return nil, false
 	}
 }
 
-func scopeFromMap(data map[string]any) (gate.ScopeSet, bool) {
+func scopeFromMap(data map[string]any) (gate.ScopeChain, bool) {
 	if len(data) == 0 {
-		return gate.ScopeSet{}, false
+		return nil, false
 	}
-	scopeSet := gate.ScopeSet{}
+	system := false
+	tenantID := ""
+	orgID := ""
+	userID := ""
 	if val, ok := data[scope.MetadataTenantID]; ok {
-		scopeSet.TenantID, _ = val.(string)
+		tenantID, _ = val.(string)
 	}
 	if val, ok := data[scope.MetadataOrgID]; ok {
-		scopeSet.OrgID, _ = val.(string)
+		orgID, _ = val.(string)
 	}
 	if val, ok := data[scope.MetadataUserID]; ok {
-		scopeSet.UserID, _ = val.(string)
+		userID, _ = val.(string)
 	}
 	if val, ok := data["system"]; ok {
 		if flag, ok := val.(bool); ok {
-			scopeSet.System = flag
+			system = flag
 		}
 	}
-	if scopeSet == (gate.ScopeSet{}) {
-		return gate.ScopeSet{}, false
+	if system {
+		return gate.ScopeChain{{Kind: gate.ScopeSystem}}, true
 	}
-	return scopeSet, true
+	chain := make(gate.ScopeChain, 0, 4)
+	if userID != "" {
+		chain = append(chain, gate.ScopeRef{Kind: gate.ScopeUser, ID: userID, TenantID: tenantID, OrgID: orgID})
+	}
+	if orgID != "" {
+		chain = append(chain, gate.ScopeRef{Kind: gate.ScopeOrg, ID: orgID, TenantID: tenantID, OrgID: orgID})
+	}
+	if tenantID != "" {
+		chain = append(chain, gate.ScopeRef{Kind: gate.ScopeTenant, ID: tenantID, TenantID: tenantID})
+	}
+	chain = append(chain, gate.ScopeRef{Kind: gate.ScopeSystem})
+	if len(chain) == 0 {
+		return nil, false
+	}
+	return chain, true
 }
 
 func templateData(execCtx *pongo2.ExecutionContext) map[string]any {
