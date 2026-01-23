@@ -21,18 +21,11 @@ type MemoryStore struct {
 	entries map[string]map[scopeKey]Override
 }
 
-type scopeKind string
-
-const (
-	scopeSystem scopeKind = "system"
-	scopeTenant scopeKind = "tenant"
-	scopeOrg    scopeKind = "org"
-	scopeUser   scopeKind = "user"
-)
-
 type scopeKey struct {
-	kind scopeKind
-	id   string
+	kind     gate.ScopeKind
+	id       string
+	tenantID string
+	orgID    string
 }
 
 // NewMemoryStore constructs an in-memory override store.
@@ -40,36 +33,41 @@ func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{entries: map[string]map[scopeKey]Override{}}
 }
 
-// Get implements Reader.
-func (m *MemoryStore) Get(_ context.Context, key string, scopeSet gate.ScopeSet) (Override, error) {
+// GetAll implements Reader.
+func (m *MemoryStore) GetAll(_ context.Context, key string, chain gate.ScopeChain) ([]OverrideMatch, error) {
 	if m == nil {
-		return MissingOverride(), storeRequiredError(key, scopeSet, "get")
+		return nil, storeRequiredError(key, gate.ScopeRef{}, "get_all")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
-		return MissingOverride(), err
+		return nil, err
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	entries := m.entries[normalized]
 	if len(entries) == 0 {
-		return MissingOverride(), nil
+		return nil, nil
 	}
-	for _, scope := range readScopes(scopeSet) {
+	matches := make([]OverrideMatch, 0)
+	for _, ref := range chain {
+		scope := scopeKeyFromRef(ref)
 		if override, ok := entries[scope]; ok {
 			if override.State == "" {
 				override.State = gate.OverrideStateMissing
 			}
-			return override, nil
+			matches = append(matches, OverrideMatch{
+				Scope:    ref,
+				Override: override,
+			})
 		}
 	}
-	return MissingOverride(), nil
+	return matches, nil
 }
 
 // Set implements Writer.
-func (m *MemoryStore) Set(_ context.Context, key string, scopeSet gate.ScopeSet, enabled bool, _ gate.ActorRef) error {
+func (m *MemoryStore) Set(_ context.Context, key string, scopeRef gate.ScopeRef, enabled bool, _ gate.ActorRef) error {
 	if m == nil {
-		return storeRequiredError(key, scopeSet, "set")
+		return storeRequiredError(key, scopeRef, "set")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
@@ -79,7 +77,7 @@ func (m *MemoryStore) Set(_ context.Context, key string, scopeSet gate.ScopeSet,
 	if enabled {
 		override = EnabledOverride()
 	}
-	scope := writeScope(scopeSet)
+	scope := scopeKeyFromRef(scopeRef)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.entries == nil {
@@ -93,15 +91,15 @@ func (m *MemoryStore) Set(_ context.Context, key string, scopeSet gate.ScopeSet,
 }
 
 // Unset implements Writer.
-func (m *MemoryStore) Unset(_ context.Context, key string, scopeSet gate.ScopeSet, _ gate.ActorRef) error {
+func (m *MemoryStore) Unset(_ context.Context, key string, scopeRef gate.ScopeRef, _ gate.ActorRef) error {
 	if m == nil {
-		return storeRequiredError(key, scopeSet, "unset")
+		return storeRequiredError(key, scopeRef, "unset")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
 		return err
 	}
-	scope := writeScope(scopeSet)
+	scope := scopeKeyFromRef(scopeRef)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.entries == nil {
@@ -115,7 +113,7 @@ func (m *MemoryStore) Unset(_ context.Context, key string, scopeSet gate.ScopeSe
 }
 
 // Delete removes a stored override entirely.
-func (m *MemoryStore) Delete(key string, scopeSet gate.ScopeSet) bool {
+func (m *MemoryStore) Delete(key string, scopeRef gate.ScopeRef) bool {
 	if m == nil {
 		return false
 	}
@@ -123,7 +121,7 @@ func (m *MemoryStore) Delete(key string, scopeSet gate.ScopeSet) bool {
 	if err != nil {
 		return false
 	}
-	scope := writeScope(scopeSet)
+	scope := scopeKeyFromRef(scopeRef)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	entries := m.entries[normalized]
@@ -163,48 +161,33 @@ func normalizeKey(key string) (string, error) {
 	return normalized, nil
 }
 
-func readScopes(scopeSet gate.ScopeSet) []scopeKey {
-	if scopeSet.System {
-		return []scopeKey{{kind: scopeSystem}}
+func scopeKeyFromRef(ref gate.ScopeRef) scopeKey {
+	id := ref.ID
+	if id == "" {
+		switch ref.Kind {
+		case gate.ScopeTenant:
+			id = ref.TenantID
+		case gate.ScopeOrg:
+			id = ref.OrgID
+		}
 	}
-	scopes := make([]scopeKey, 0, 4)
-	if scopeSet.UserID != "" {
-		scopes = append(scopes, scopeKey{kind: scopeUser, id: scopeSet.UserID})
-	}
-	if scopeSet.OrgID != "" {
-		scopes = append(scopes, scopeKey{kind: scopeOrg, id: scopeSet.OrgID})
-	}
-	if scopeSet.TenantID != "" {
-		scopes = append(scopes, scopeKey{kind: scopeTenant, id: scopeSet.TenantID})
-	}
-	scopes = append(scopes, scopeKey{kind: scopeSystem})
-	return scopes
-}
-
-func writeScope(scopeSet gate.ScopeSet) scopeKey {
-	switch {
-	case scopeSet.System:
-		return scopeKey{kind: scopeSystem}
-	case scopeSet.UserID != "":
-		return scopeKey{kind: scopeUser, id: scopeSet.UserID}
-	case scopeSet.OrgID != "":
-		return scopeKey{kind: scopeOrg, id: scopeSet.OrgID}
-	case scopeSet.TenantID != "":
-		return scopeKey{kind: scopeTenant, id: scopeSet.TenantID}
-	default:
-		return scopeKey{kind: scopeSystem}
+	return scopeKey{
+		kind:     ref.Kind,
+		id:       id,
+		tenantID: ref.TenantID,
+		orgID:    ref.OrgID,
 	}
 }
 
 var _ ReadWriter = (*MemoryStore)(nil)
 
-func storeRequiredError(key string, scopeSet gate.ScopeSet, operation string) error {
+func storeRequiredError(key string, scopeRef gate.ScopeRef, operation string) error {
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
 	return ferrors.WrapSentinel(ferrors.ErrStoreRequired, "store: memory store is required", map[string]any{
 		ferrors.MetaFeatureKey:           trimmed,
 		ferrors.MetaFeatureKeyNormalized: normalized,
-		ferrors.MetaScope:                scopeSet,
+		ferrors.MetaScope:                scopeRef,
 		ferrors.MetaStore:                "memory",
 		ferrors.MetaOperation:            operation,
 	})
