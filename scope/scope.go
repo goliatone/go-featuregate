@@ -89,18 +89,15 @@ func UserID(ctx context.Context) string {
 	return toString(ctx.Value(userIDKey))
 }
 
-// FromContext builds a ScopeSet from context values.
-func FromContext(ctx context.Context) gate.ScopeSet {
+// ClaimsFromContext builds ActorClaims from context values.
+func ClaimsFromContext(ctx context.Context) gate.ActorClaims {
 	if ctx == nil {
-		return gate.ScopeSet{}
+		return gate.ActorClaims{}
 	}
-	if System(ctx) {
-		return gate.ScopeSet{System: true}
-	}
-	return gate.ScopeSet{
-		TenantID: TenantID(ctx),
-		OrgID:    OrgID(ctx),
-		UserID:   UserID(ctx),
+	return gate.ActorClaims{
+		SubjectID: UserID(ctx),
+		TenantID:  TenantID(ctx),
+		OrgID:     OrgID(ctx),
 	}
 }
 
