@@ -1,5 +1,32 @@
 # Changelog
 
+# [0.4.0](https://github.com/goliatone/go-featuregate/compare/v0.3.0...v0.4.0) - (2026-01-23)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Apply system scope if set ([89988ad](https://github.com/goliatone/go-featuregate/commit/89988adf45d364c12e107022cca0a73c683d49a9))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.4.0 ([1d02175](https://github.com/goliatone/go-featuregate/commit/1d02175fb61de0efb1814f3f5e62f4e9880744fd))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- New catalog guide ([4616188](https://github.com/goliatone/go-featuregate/commit/461618835079c556d10dfbd8c2723fa053d7ba48))  - (goliatone)
+- Catalog concept ([46efcd5](https://github.com/goliatone/go-featuregate/commit/46efcd5aea5d2104880d6f147e34182e32fd21fd))  - (goliatone)
+- Config adapter ([c24d458](https://github.com/goliatone/go-featuregate/commit/c24d458d3837f2e48f3f2d3cfe7af844886efeb4))  - (goliatone)
+- NormalizeScopeSet ensures system take over ([76e2adb](https://github.com/goliatone/go-featuregate/commit/76e2adbac28506049142fde59f6f9e3588f877f8))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.3.0 ([05a5432](https://github.com/goliatone/go-featuregate/commit/05a54328de127f50c8112447fb85b90d31bb01e1))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update readme ([a593415](https://github.com/goliatone/go-featuregate/commit/a59341551f96231367acbbe2d6399158fa507637))  - (goliatone)
+- Add guides ([176f36a](https://github.com/goliatone/go-featuregate/commit/176f36a1e55de264ed21af6152fbe576ff2af7ad))  - (goliatone)
+- Update tests ([b5422d3](https://github.com/goliatone/go-featuregate/commit/b5422d36920fc013a4409c1d46fdb8c3bb9f951f))  - (goliatone)
+
 # [0.3.0](https://github.com/goliatone/go-featuregate/compare/v0.2.0...v0.3.0) - (2026-01-22)
 
 ## <!-- 13 -->📦 Bumps
