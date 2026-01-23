@@ -100,16 +100,18 @@ type FeatureFlagRecord struct {
 	UpdatedAt     time.Time `bun:"updated_at,nullzero"`
 }
 
-// Get implements store.Reader.
-func (s *Store) Get(ctx context.Context, key string, scopeSet gate.ScopeSet) (store.Override, error) {
+// GetAll implements store.Reader.
+func (s *Store) GetAll(ctx context.Context, key string, chain gate.ScopeChain) ([]store.OverrideMatch, error) {
 	if s == nil || s.db == nil {
-		return store.MissingOverride(), storeRequiredError(key, scopeSet, "get")
+		return nil, storeRequiredError(key, gate.ScopeRef{}, "get_all")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
-		return store.MissingOverride(), err
+		return nil, err
 	}
-	for _, scope := range readScopes(scopeSet) {
+	matches := make([]store.OverrideMatch, 0)
+	for _, ref := range chain {
+		scope := scopeKeyFromRef(ref)
 		record := FeatureFlagRecord{}
 		query := s.db.NewSelect().Model(&record).
 			Where("key = ?", normalized).
@@ -123,57 +125,60 @@ func (s *Store) Get(ctx context.Context, key string, scopeSet gate.ScopeSet) (st
 			if errors.Is(err, sql.ErrNoRows) {
 				continue
 			}
-			return store.MissingOverride(), ferrors.WrapExternal(err, ferrors.TextCodeStoreReadFailed, "bunadapter: read failed", map[string]any{
+			return nil, ferrors.WrapExternal(err, ferrors.TextCodeStoreReadFailed, "bunadapter: read failed", map[string]any{
 				ferrors.MetaAdapter:              "bun",
 				ferrors.MetaStore:                "bun",
 				ferrors.MetaTable:                s.table,
 				ferrors.MetaFeatureKey:           strings.TrimSpace(key),
 				ferrors.MetaFeatureKeyNormalized: normalized,
-				ferrors.MetaScope:                scopeSet,
-				ferrors.MetaOperation:            "get",
+				ferrors.MetaScope:                ref,
+				ferrors.MetaOperation:            "get_all",
 			})
 		}
-		return overrideFromRecord(record), nil
+		matches = append(matches, store.OverrideMatch{
+			Scope:    ref,
+			Override: overrideFromRecord(record),
+		})
 	}
-	return store.MissingOverride(), nil
+	return matches, nil
 }
 
 // Set implements store.Writer.
-func (s *Store) Set(ctx context.Context, key string, scopeSet gate.ScopeSet, enabled bool, actor gate.ActorRef) error {
+func (s *Store) Set(ctx context.Context, key string, scopeRef gate.ScopeRef, enabled bool, actor gate.ActorRef) error {
 	if s == nil || s.db == nil {
-		return storeRequiredError(key, scopeSet, "set")
+		return storeRequiredError(key, scopeRef, "set")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
 		return err
 	}
-	scope := writeScope(scopeSet)
+	scope := scopeKeyFromRef(scopeRef)
 	return s.upsert(ctx, normalized, scope, boolPtr(enabled), actor)
 }
 
 // Unset implements store.Writer.
-func (s *Store) Unset(ctx context.Context, key string, scopeSet gate.ScopeSet, actor gate.ActorRef) error {
+func (s *Store) Unset(ctx context.Context, key string, scopeRef gate.ScopeRef, actor gate.ActorRef) error {
 	if s == nil || s.db == nil {
-		return storeRequiredError(key, scopeSet, "unset")
+		return storeRequiredError(key, scopeRef, "unset")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
 		return err
 	}
-	scope := writeScope(scopeSet)
+	scope := scopeKeyFromRef(scopeRef)
 	return s.upsert(ctx, normalized, scope, nil, actor)
 }
 
 // Delete removes a stored override row.
-func (s *Store) Delete(ctx context.Context, key string, scopeSet gate.ScopeSet) error {
+func (s *Store) Delete(ctx context.Context, key string, scopeRef gate.ScopeRef) error {
 	if s == nil || s.db == nil {
-		return storeRequiredError(key, scopeSet, "delete")
+		return storeRequiredError(key, scopeRef, "delete")
 	}
 	normalized, err := normalizeKey(key)
 	if err != nil {
 		return err
 	}
-	scope := writeScope(scopeSet)
+	scope := scopeKeyFromRef(scopeRef)
 	query := s.db.NewDelete().
 		Where("key = ?", normalized).
 		Where("scope_type = ?", scope.kind).
@@ -189,7 +194,7 @@ func (s *Store) Delete(ctx context.Context, key string, scopeSet gate.ScopeSet) 
 			ferrors.MetaTable:                s.table,
 			ferrors.MetaFeatureKey:           strings.TrimSpace(key),
 			ferrors.MetaFeatureKeyNormalized: normalized,
-			ferrors.MetaScope:                scopeSet,
+			ferrors.MetaScope:                scopeRef,
 			ferrors.MetaOperation:            "delete",
 		})
 	}
@@ -271,39 +276,53 @@ const (
 	scopeTenant scopeKind = "tenant"
 	scopeOrg    scopeKind = "org"
 	scopeUser   scopeKind = "user"
+	scopeRole   scopeKind = "role"
+	scopePerm   scopeKind = "perm"
 )
 
-func readScopes(scopeSet gate.ScopeSet) []scopeKey {
-	if scopeSet.System {
-		return []scopeKey{{kind: scopeSystem}}
+func scopeKeyFromRef(ref gate.ScopeRef) scopeKey {
+	return scopeKey{
+		kind: scopeKindFromRef(ref.Kind),
+		id:   scopeIDFromRef(ref),
 	}
-	scopes := make([]scopeKey, 0, 4)
-	if scopeSet.UserID != "" {
-		scopes = append(scopes, scopeKey{kind: scopeUser, id: scopeSet.UserID})
-	}
-	if scopeSet.OrgID != "" {
-		scopes = append(scopes, scopeKey{kind: scopeOrg, id: scopeSet.OrgID})
-	}
-	if scopeSet.TenantID != "" {
-		scopes = append(scopes, scopeKey{kind: scopeTenant, id: scopeSet.TenantID})
-	}
-	scopes = append(scopes, scopeKey{kind: scopeSystem})
-	return scopes
 }
 
-func writeScope(scopeSet gate.ScopeSet) scopeKey {
-	switch {
-	case scopeSet.System:
-		return scopeKey{kind: scopeSystem}
-	case scopeSet.UserID != "":
-		return scopeKey{kind: scopeUser, id: scopeSet.UserID}
-	case scopeSet.OrgID != "":
-		return scopeKey{kind: scopeOrg, id: scopeSet.OrgID}
-	case scopeSet.TenantID != "":
-		return scopeKey{kind: scopeTenant, id: scopeSet.TenantID}
+func scopeKindFromRef(kind gate.ScopeKind) scopeKind {
+	switch kind {
+	case gate.ScopeSystem:
+		return scopeSystem
+	case gate.ScopeTenant:
+		return scopeTenant
+	case gate.ScopeOrg:
+		return scopeOrg
+	case gate.ScopeUser:
+		return scopeUser
+	case gate.ScopeRole:
+		return scopeRole
+	case gate.ScopePerm:
+		return scopePerm
 	default:
-		return scopeKey{kind: scopeSystem}
+		return scopeSystem
 	}
+}
+
+func scopeIDFromRef(ref gate.ScopeRef) string {
+	if ref.Kind == gate.ScopeSystem {
+		return ""
+	}
+	id := ref.ID
+	if id == "" {
+		switch ref.Kind {
+		case gate.ScopeTenant:
+			id = ref.TenantID
+		case gate.ScopeOrg:
+			id = ref.OrgID
+		}
+	}
+	if ref.TenantID == "" && ref.OrgID == "" {
+		return id
+	}
+	return strings.Join([]string{ref.TenantID, ref.OrgID, id}, "|")
 }
 
 func overrideFromRecord(record FeatureFlagRecord) store.Override {
@@ -318,7 +337,7 @@ func overrideFromRecord(record FeatureFlagRecord) store.Override {
 
 var _ store.ReadWriter = (*Store)(nil)
 
-func storeRequiredError(key string, scopeSet gate.ScopeSet, operation string) error {
+func storeRequiredError(key string, scopeRef gate.ScopeRef, operation string) error {
 	trimmed := strings.TrimSpace(key)
 	normalized := gate.NormalizeKey(trimmed)
 	return ferrors.WrapSentinel(ferrors.ErrStoreRequired, "bunadapter: db is required", map[string]any{
@@ -326,7 +345,7 @@ func storeRequiredError(key string, scopeSet gate.ScopeSet, operation string) er
 		ferrors.MetaStore:                "bun",
 		ferrors.MetaFeatureKey:           trimmed,
 		ferrors.MetaFeatureKeyNormalized: normalized,
-		ferrors.MetaScope:                scopeSet,
+		ferrors.MetaScope:                scopeRef,
 		ferrors.MetaOperation:            operation,
 	})
 }
