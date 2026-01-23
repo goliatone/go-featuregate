@@ -16,6 +16,8 @@ type OverrideTrace struct {
 	State OverrideState
 	Value *bool
 	Error error
+	Match ScopeRef
+	Matches []OverrideMatchTrace
 }
 
 // DefaultTrace captures config default resolution details.
@@ -29,19 +31,21 @@ type DefaultTrace struct {
 type ResolveTrace struct {
 	Key           string
 	NormalizedKey string
-	Scope         ScopeSet
+	Chain         ScopeChain
 	Value         bool
 	Source        ResolveSource
 	Override      OverrideTrace
 	Default       DefaultTrace
 	CacheHit      bool
+	Strategy      string
+	ClaimsFailureMode string
 }
 
 // ResolveEvent is emitted after resolution for hooks.
 type ResolveEvent struct {
 	Key           string
 	NormalizedKey string
-	Scope         ScopeSet
+	Chain         ScopeChain
 	Value         bool
 	Source        ResolveSource
 	Error         error
@@ -51,6 +55,13 @@ type ResolveEvent struct {
 // ResolveHook receives resolution events.
 type ResolveHook interface {
 	OnResolve(ctx context.Context, event ResolveEvent)
+}
+
+// OverrideMatchTrace captures a single matched override for trace output.
+type OverrideMatchTrace struct {
+	Scope ScopeRef
+	State OverrideState
+	Value *bool
 }
 
 // ResolveHookFunc wraps a function as a ResolveHook.
