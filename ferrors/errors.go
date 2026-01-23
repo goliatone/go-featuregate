@@ -8,6 +8,7 @@ const (
 	MetaFeatureKey           = "feature_key"
 	MetaFeatureKeyNormalized = "feature_key_norm"
 	MetaScope                = "scope"
+	MetaChain                = "scope_chain"
 	MetaStore                = "store"
 	MetaAdapter              = "adapter"
 	MetaDomain               = "domain"
