@@ -1,5 +1,36 @@
 # Changelog
 
+# [0.5.0](https://github.com/goliatone/go-featuregate/compare/v0.4.0...v0.5.0) - (2026-01-23)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.5.0 ([933c6e0](https://github.com/goliatone/go-featuregate/commit/933c6e089303ae02ed37353fe895daab19c25f86))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Scope chain in helpers ([e1e02c7](https://github.com/goliatone/go-featuregate/commit/e1e02c750a1b5d6be47a878986d6b0087ea8a650))  - (goliatone)
+- Store new interface ([da6ffd1](https://github.com/goliatone/go-featuregate/commit/da6ffd1cb2bcf1da08dc945a975c8da058e8d544))  - (goliatone)
+- Store implement new interface ([b76109a](https://github.com/goliatone/go-featuregate/commit/b76109ac51b92e453d9388b1b8b449dd7821208e))  - (goliatone)
+- Scope handles actor claims ([1f3866e](https://github.com/goliatone/go-featuregate/commit/1f3866ed426aed4d850a1ff59c5e277f3d497b4f))  - (goliatone)
+- Resolver strategy implementation ([773c86b](https://github.com/goliatone/go-featuregate/commit/773c86b88331178d2f4c940566f31da3bbef4d74))  - (goliatone)
+- Trace implements override trace ([e8c1b74](https://github.com/goliatone/go-featuregate/commit/e8c1b748149d51b42da36c6ef847bd915888cce4))  - (goliatone)
+- Scope chain in gate ([5f521e7](https://github.com/goliatone/go-featuregate/commit/5f521e7be96b0b0823cc4138f6ee91a630bd9ec8))  - (goliatone)
+- Meta chain scope error ([49a0304](https://github.com/goliatone/go-featuregate/commit/49a0304fd46b7e3ec67a0a945c50f980e8ca9ca5))  - (goliatone)
+- Cache uses scope chains ([ae1cfc0](https://github.com/goliatone/go-featuregate/commit/ae1cfc060e93919d977b1d46c2b929a597debc31))  - (goliatone)
+- Update store to reflect new interfaces ([9120a30](https://github.com/goliatone/go-featuregate/commit/9120a304079320b357c8645f4b30bf922bbd372a))  - (goliatone)
+- Migrate to ScopeRef ([4962876](https://github.com/goliatone/go-featuregate/commit/4962876118c5ebd6782470bb3245732f620ea66d))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.4.0 ([25d284c](https://github.com/goliatone/go-featuregate/commit/25d284c71a79e5faabc6d2e89b6a85d6c7230e09))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update examples ([ecb2dd3](https://github.com/goliatone/go-featuregate/commit/ecb2dd3c5ad999d9e0df38f2729abd4ac13e2321))  - (goliatone)
+- Update readme ([129eed8](https://github.com/goliatone/go-featuregate/commit/129eed80569bcd8203ca98c06c132b7de1bd9fc7))  - (goliatone)
+- Update guides ([43d4022](https://github.com/goliatone/go-featuregate/commit/43d40228ef3c952b6131df122195ab57fed5e248))  - (goliatone)
+- Update tests ([ff4801a](https://github.com/goliatone/go-featuregate/commit/ff4801ae7716e152927221d94ba8b2b4c3aeab04))  - (goliatone)
+
 # [0.4.0](https://github.com/goliatone/go-featuregate/compare/v0.3.0...v0.4.0) - (2026-01-23)
 
 ## <!-- 1 -->🐛 Bug Fixes
