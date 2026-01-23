@@ -13,7 +13,7 @@ This document tracks user guides for `go-featuregate`. Each guide helps users un
 
 ## 1. GUIDE_GETTING_STARTED.md
 
-**Status**: `review`
+**Status**: `done`
 
 **Purpose**: Get users checking feature flags in under 5 minutes.
 
@@ -336,7 +336,7 @@ This document tracks user guides for `go-featuregate`. Each guide helps users un
 
 | Guide | Audience | Complexity | Status |
 |-------|----------|------------|--------|
-| GUIDE_GETTING_STARTED | New users | Beginner | `review` |
+| GUIDE_GETTING_STARTED | New users | Beginner | `done` |
 | GUIDE_RESOLUTION | Backend developers | Intermediate | `review` |
 | GUIDE_SCOPES | Backend developers | Intermediate | `review` |
 | GUIDE_OVERRIDES | Backend developers | Intermediate | `review` |

@@ -19,6 +19,21 @@ go get github.com/goliatone/go-featuregate
 
 Requires Go 1.24+.
 
+New project quick start:
+
+```bash
+mkdir -p featuregate-demo
+cd featuregate-demo
+go mod init example.com/featuregate-demo
+go get github.com/goliatone/go-featuregate
+```
+
+Save one of the Quick Start examples as `main.go`, then run from `featuregate-demo`:
+
+```bash
+go run .
+```
+
 ## Quick Start
 
 ### 1. Config Defaults Only
@@ -46,14 +61,14 @@ func main() {
     })
 
     // Create the gate
-    gate := resolver.New(
+    featureGate := resolver.New(
         resolver.WithDefaults(defaults),
     )
 
     // Check feature enablement
     ctx := context.Background()
 
-    enabled, err := gate.Enabled(ctx, "users.signup")
+    enabled, err := featureGate.Enabled(ctx, "users.signup")
     if err != nil {
         log.Fatal(err)
     }
@@ -61,7 +76,7 @@ func main() {
         fmt.Println("User signup is enabled")
     }
 
-    enabled, err = gate.Enabled(ctx, "dashboard")
+    enabled, err = featureGate.Enabled(ctx, "dashboard")
     if err != nil {
         log.Fatal(err)
     }
@@ -74,6 +89,7 @@ func main() {
 ```
 
 Output:
+
 ```
 User signup is enabled
 Dashboard is disabled
@@ -146,6 +162,7 @@ func main() {
 ```
 
 Output:
+
 ```
 beta.features (default): false
 beta.features (override): true
@@ -165,8 +182,9 @@ Feature keys are dot-separated strings that identify features:
 "beta.new_editor"        // Beta new editor feature
 ```
 
-Keys are trimmed and aliases are resolved (if configured). Use lowercase dot-delimited
-keys by convention, and call `gate.NormalizeKey()` for consistency.
+Keys are trimmed and aliases are resolved (aliases are disabled by default). Use
+lowercase dot-delimited keys by convention, and call `gate.NormalizeKey()` for
+consistency. See [GUIDE_RESOLUTION](GUIDE_RESOLUTION.md) for alias details.
 
 ### Resolution Order
 
@@ -218,7 +236,8 @@ featureGate.Set(ctx, "feature.key", scope, true, actor)
 
 The snippets in this section assume the defaults and override store setup from the
 Quick Start examples (including `featureGate`, `ctx`, `scope`, and imports), and
-focus on the specific option being added.
+focus on the specific option being added. For reference, this section typically
+needs `context`, `log`, and the `gate`, `resolver`, `activity`, and `cache` packages.
 
 ### Strict Store Mode
 
@@ -234,9 +253,11 @@ featureGate := resolver.New(
 
 ### Caching
 
-Add a cache to reduce store lookups:
+Add a cache to reduce store lookups. See [GUIDE_CACHING](GUIDE_CACHING.md) for cache
+implementations:
 
 ```go
+// See GUIDE_CACHING for cache implementations.
 featureGate := resolver.New(
     resolver.WithDefaults(defaults),
     resolver.WithOverrideStore(overrides),
@@ -262,10 +283,17 @@ featureGate := resolver.New(
 
 ## Debugging with Traces
 
-Use `ResolveWithTrace` to understand why a feature resolved to a specific value:
+Use `ResolveWithTrace` to understand why a feature resolved to a specific value. If you store the gate as `gate.FeatureGate`, assert it to `gate.TraceableFeatureGate` first:
 
 ```go
-enabled, trace, err := featureGate.ResolveWithTrace(ctx, "dashboard", gate.WithScopeSet(scope))
+traceable, ok := featureGate.(gate.TraceableFeatureGate)
+if !ok {
+    log.Fatal("feature gate does not support trace resolution")
+}
+```
+
+```go
+enabled, trace, err := traceable.ResolveWithTrace(ctx, "dashboard", gate.WithScopeSet(scope))
 if err != nil {
     log.Fatal(err)
 }
@@ -288,6 +316,11 @@ go run ./examples/config_only
 # Runtime overrides
 go run ./examples/runtime_overrides
 ```
+
+## Troubleshooting
+
+- **Set/Unset returns ErrStoreUnavailable**: Ensure the override store implements
+  `store.Writer`. `store.NewMemoryStore()` does, but read-only stores do not.
 
 ## Next Steps
 
