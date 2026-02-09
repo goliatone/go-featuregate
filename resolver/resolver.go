@@ -40,23 +40,23 @@ func (NoopDefaults) Default(context.Context, string) (DefaultResult, error) {
 
 // Gate resolves feature values using overrides, defaults, and fallbacks.
 type Gate struct {
-	defaults                 Defaults
-	overrides                store.Reader
-	writer                   store.Writer
-	claimsProvider           gate.ClaimsProvider
-	permissionProvider       gate.PermissionProvider
-	cache                    cache.Cache
-	hooks                    []gate.ResolveHook
-	updateHooks              []activity.Hook
-	strictStore              bool
-	scopeOrder               []gate.ScopeKind
-	strategy                 ResolveStrategy
-	failureMode              ClaimsFailureMode
-	failureFallbackChain      gate.ScopeChain
-	appendSystemOnFailure     bool
+	defaults                    Defaults
+	overrides                   store.Reader
+	writer                      store.Writer
+	claimsProvider              gate.ClaimsProvider
+	permissionProvider          gate.PermissionProvider
+	cache                       cache.Cache
+	hooks                       []gate.ResolveHook
+	updateHooks                 []activity.Hook
+	strictStore                 bool
+	scopeOrder                  []gate.ScopeKind
+	strategy                    ResolveStrategy
+	failureMode                 ClaimsFailureMode
+	failureFallbackChain        gate.ScopeChain
+	appendSystemOnFailure       bool
 	appendSystemOnProvidedChain bool
-	preserveRolePermOrder     bool
-	rolePermNormalizer        IdentifierNormalizer
+	preserveRolePermOrder       bool
+	rolePermNormalizer          IdentifierNormalizer
 }
 
 // Option customizes a Gate.
@@ -266,14 +266,14 @@ func WithStrictStore(strict bool) Option {
 // New constructs a Gate with the provided options.
 func New(options ...Option) *Gate {
 	g := &Gate{
-		defaults:             NoopDefaults{},
-		cache:                cache.NoopCache{},
-		scopeOrder:           defaultScopeOrder(),
-		strategy:             defaultResolveStrategy,
-		failureMode:          FailOpen,
-		appendSystemOnFailure: true,
+		defaults:                    NoopDefaults{},
+		cache:                       cache.NoopCache{},
+		scopeOrder:                  defaultScopeOrder(),
+		strategy:                    defaultResolveStrategy,
+		failureMode:                 FailOpen,
+		appendSystemOnFailure:       true,
 		appendSystemOnProvidedChain: false,
-		rolePermNormalizer:   defaultRolePermNormalizer,
+		rolePermNormalizer:          defaultRolePermNormalizer,
 	}
 	for _, opt := range options {
 		if opt != nil {
@@ -897,11 +897,11 @@ func groupOrderFor(scopeOrder []gate.ScopeKind) []groupKind {
 type groupKind string
 
 const (
-	groupUser    groupKind = "user"
+	groupUser     groupKind = "user"
 	groupRolePerm groupKind = "role_perm"
-	groupOrg     groupKind = "org"
-	groupTenant  groupKind = "tenant"
-	groupSystem  groupKind = "system"
+	groupOrg      groupKind = "org"
+	groupTenant   groupKind = "tenant"
+	groupSystem   groupKind = "system"
 )
 
 func containsGroup(groups []groupKind, target groupKind) bool {
@@ -1097,4 +1097,3 @@ func (g *Gate) unsetAliases(ctx context.Context, normalized string, scopeRef gat
 	}
 	return nil
 }
-
