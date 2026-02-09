@@ -1,28 +1,24 @@
 # Changelog
 
-# [Unreleased]
+# [0.6.0](https://github.com/goliatone/go-featuregate/compare/v0.5.0...v0.6.0) - (2026-02-09)
 
-## ➕ Add
+## <!-- 13 -->📦 Bumps
 
-- Add first-class preferences-backed state adapter in `adapters/optionsadapter`:
-  - `NewPreferencesStoreAdapter(...)`
-  - `WithKeyPrefix(...)`
-  - `WithKeys(...)`
-  - `WithDeleteMissing(bool)` (defaults to `false`)
-- Add scope mapping for `system`/`tenant`/`org`/`user`.
-- Add nested flatten/unflatten with array path support (`a.b.0.c`).
-- Add exported sentinel errors:
-  - `ErrPreferencesStoreRequired`
-  - `ErrPreferencesScopeMetadataInvalid`
-  - `ErrPreferencesPathInvalid`
-- Add external compile test from a separate module.
+- Bump version: v0.6.0 ([6ac06d7](https://github.com/goliatone/go-featuregate/commit/6ac06d7267ed56d8a4063318b3b4b4b9a8184473))  - (goliatone)
 
-## Migration
+## <!-- 16 -->➕ Add
 
-- Consumers with custom preferences-to-`state.Store[map[string]any]` glue can replace it with
-  `optionsadapter.NewPreferencesStoreAdapter`.
-- Safe deletion behavior now defaults to no pruning. Enable key pruning explicitly with
-  `optionsadapter.WithDeleteMissing(true)` after setting a stable prefix/allowlist boundary.
+- Preference adapter for options ([875d055](https://github.com/goliatone/go-featuregate/commit/875d0555b54f9041139b7053aab02a5fee4e93d1))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.5.0 ([1c00cbb](https://github.com/goliatone/go-featuregate/commit/1c00cbbb95b1f1b0346c19fbd887c83c344d3044))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update docs ([31122a0](https://github.com/goliatone/go-featuregate/commit/31122a01d4d1e8971bb410e52c3b17ffc42db56f))  - (goliatone)
+- Update format ([ac674fa](https://github.com/goliatone/go-featuregate/commit/ac674fac00ea211b42c364c8aab4a2b0e91d3d39))  - (goliatone)
+- Udpate tests ([65a9b26](https://github.com/goliatone/go-featuregate/commit/65a9b26b6dba3101cdfda362db8a01ca1d309371))  - (goliatone)
 
 # [0.5.0](https://github.com/goliatone/go-featuregate/compare/v0.4.0...v0.5.0) - (2026-01-23)
 
@@ -164,4 +160,5 @@
 - Update tests ([fe59692](https://github.com/goliatone/go-featuregate/commit/fe59692d3aadb8ffb0fc3fbe05655399d11e2238))  - (goliatone)
 - Update format ([be13013](https://github.com/goliatone/go-featuregate/commit/be13013f83b991ee0b34d935d7564462f87208b3))  - (goliatone)
 - Initial commit ([43e4bc2](https://github.com/goliatone/go-featuregate/commit/43e4bc269511d0da2fae6d558bc41fcc5af664ea))  - (goliatone)
+
 
