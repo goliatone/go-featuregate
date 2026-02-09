@@ -257,23 +257,39 @@ overrides := optionsadapter.NewStore(stateStore,
 )
 ```
 
-### With go-admin Preferences Store
+### Preferences-Backed State Adapter
 
-Use the go-admin preferences store as a backend:
+Use the built-in adapter when your backend exposes Resolve/Upsert/Delete operations:
 
 ```go
-import (
-    "github.com/goliatone/go-admin/featuregate/adapter"
-    "github.com/goliatone/go-featuregate/adapters/optionsadapter"
-)
+import "github.com/goliatone/go-featuregate/adapters/optionsadapter"
 
-prefs := admin.NewInMemoryPreferencesStore()
-stateStore := adapter.NewPreferencesStoreAdapter(prefs)
+prefs := myPreferencesStore // implements optionsadapter.PreferencesStore
+stateStore := optionsadapter.NewPreferencesStoreAdapter(
+    prefs,
+    optionsadapter.WithKeyPrefix("feature_flags"),
+    optionsadapter.WithKeys("users.signup", "users.password_reset"),
+    optionsadapter.WithDeleteMissing(false), // default false (safe)
+)
 
 overrides := optionsadapter.NewStore(stateStore,
     optionsadapter.WithDomain("feature_flags"),
 )
 ```
+
+Behavior:
+
+- Scope conversion: `system`, `tenant`, `org`, `user`
+- Prefixing: `state.Ref.Domain` by default, override with `WithKeyPrefix`
+- Nested flatten/unflatten supports arrays (`a.b.0.c`)
+- `Save` can delete missing keys only when `WithDeleteMissing(true)` is set
+- Allowlist (`WithKeys`) constrains load/save/delete to adapter-owned keys
+
+Error sentinels (`errors.Is`):
+
+- `optionsadapter.ErrPreferencesStoreRequired`
+- `optionsadapter.ErrPreferencesScopeMetadataInvalid`
+- `optionsadapter.ErrPreferencesPathInvalid`
 
 ## go-auth Adapter
 
