@@ -1,5 +1,29 @@
 # Changelog
 
+# [Unreleased]
+
+## ➕ Add
+
+- Add first-class preferences-backed state adapter in `adapters/optionsadapter`:
+  - `NewPreferencesStoreAdapter(...)`
+  - `WithKeyPrefix(...)`
+  - `WithKeys(...)`
+  - `WithDeleteMissing(bool)` (defaults to `false`)
+- Add scope mapping for `system`/`tenant`/`org`/`user`.
+- Add nested flatten/unflatten with array path support (`a.b.0.c`).
+- Add exported sentinel errors:
+  - `ErrPreferencesStoreRequired`
+  - `ErrPreferencesScopeMetadataInvalid`
+  - `ErrPreferencesPathInvalid`
+- Add external compile test from a separate module.
+
+## Migration
+
+- Consumers with custom preferences-to-`state.Store[map[string]any]` glue can replace it with
+  `optionsadapter.NewPreferencesStoreAdapter`.
+- Safe deletion behavior now defaults to no pruning. Enable key pruning explicitly with
+  `optionsadapter.WithDeleteMissing(true)` after setting a stable prefix/allowlist boundary.
+
 # [0.5.0](https://github.com/goliatone/go-featuregate/compare/v0.4.0...v0.5.0) - (2026-01-23)
 
 ## <!-- 13 -->📦 Bumps
@@ -140,5 +164,4 @@
 - Update tests ([fe59692](https://github.com/goliatone/go-featuregate/commit/fe59692d3aadb8ffb0fc3fbe05655399d11e2238))  - (goliatone)
 - Update format ([be13013](https://github.com/goliatone/go-featuregate/commit/be13013f83b991ee0b34d935d7564462f87208b3))  - (goliatone)
 - Initial commit ([43e4bc2](https://github.com/goliatone/go-featuregate/commit/43e4bc269511d0da2fae6d558bc41fcc5af664ea))  - (goliatone)
-
 
