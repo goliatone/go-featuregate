@@ -13,10 +13,10 @@ const (
 
 // OverrideTrace captures override resolution details.
 type OverrideTrace struct {
-	State OverrideState
-	Value *bool
-	Error error
-	Match ScopeRef
+	State   OverrideState
+	Value   *bool
+	Error   error
+	Match   ScopeRef
 	Matches []OverrideMatchTrace
 }
 
@@ -29,15 +29,15 @@ type DefaultTrace struct {
 
 // ResolveTrace captures provenance for a single feature resolution.
 type ResolveTrace struct {
-	Key           string
-	NormalizedKey string
-	Chain         ScopeChain
-	Value         bool
-	Source        ResolveSource
-	Override      OverrideTrace
-	Default       DefaultTrace
-	CacheHit      bool
-	Strategy      string
+	Key               string
+	NormalizedKey     string
+	Chain             ScopeChain
+	Value             bool
+	Source            ResolveSource
+	Override          OverrideTrace
+	Default           DefaultTrace
+	CacheHit          bool
+	Strategy          string
 	ClaimsFailureMode string
 }
 
