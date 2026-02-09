@@ -151,14 +151,29 @@ gate := resolver.New(
 )
 ```
 
-Use the PreferencesStore adapter from go-admin (`github.com/goliatone/go-admin/featuregate/adapter`)
-when go-admin is the backing store:
+Use the built-in preferences-backed state adapter when your runtime overrides are stored
+as scoped key/value preferences:
 
 ```go
-prefs := admin.NewInMemoryPreferencesStore()
-stateStore := featuregateadapter.NewPreferencesStoreAdapter(prefs)
+prefs := myPreferencesStore // implements optionsadapter.PreferencesStore
+stateStore := optionsadapter.NewPreferencesStoreAdapter(
+	prefs,
+	optionsadapter.WithKeyPrefix("feature_flags"),
+	optionsadapter.WithKeys("users.signup", "users.password_reset"),
+	// Safe default is false; set true to prune missing keys inside adapter-owned namespace.
+	optionsadapter.WithDeleteMissing(false),
+)
 overrides := optionsadapter.NewStore(stateStore, optionsadapter.WithDomain("feature_flags"))
 ```
+
+`NewPreferencesStoreAdapter` behavior:
+- Maps go-options scopes to preferences levels: `system`, `tenant`, `org`, `user`
+- Uses `state.Ref.Domain` as key prefix by default (or `WithKeyPrefix`)
+- Supports nested map flatten/unflatten with array paths (`a.b.0.c`)
+- Exposes sentinel errors with `errors.Is` support:
+  - `optionsadapter.ErrPreferencesStoreRequired`
+  - `optionsadapter.ErrPreferencesScopeMetadataInvalid`
+  - `optionsadapter.ErrPreferencesPathInvalid`
 
 Use `optionsadapter.WithScopeBuilder` or `optionsadapter.WithMetaBuilder` to customize scope
 ordering or stored metadata.
