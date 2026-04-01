@@ -1,5 +1,8 @@
 # Adapters Guide
 
+> **API Status (2026-02-18):** Current go-featuregate APIs use `gate.ScopeRef`, `gate.ScopeChain`, `gate.WithScopeChain`, and `resolver.WithClaimsProvider`. Some snippets in this guide still use legacy `ScopeSet`/`WithScopeSet`; translate them using `../MIGRATION.md`.
+
+
 This guide covers the adapter system in go-featuregate for integrating with external configuration sources, databases, and framework components.
 
 ## Overview

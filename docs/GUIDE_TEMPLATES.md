@@ -60,7 +60,7 @@ The helpers look for these keys in template data:
 | Key | Type | Purpose |
 |-----|------|---------|
 | `feature_ctx` | `context.Context` | Request context for live resolution |
-| `feature_scope` | `gate.ScopeSet` or `map[string]any` | Explicit scope override |
+| `feature_scope` | `gate.ScopeChain`, `gate.ScopeRef`, or `map[string]any` | Explicit scope override |
 | `feature_snapshot` | `map[string]bool` or `Snapshot` | Precomputed values |
 
 ### Setting Template Data
@@ -195,7 +195,7 @@ Returns a `ResolveTrace` object with:
 - `Key` - Normalized feature key
 - `Value` - Resolved boolean value
 - `Source` - Where the value came from (override, default, fallback)
-- `Scope` - The scope used for resolution
+- `Chain` - The scope chain used for resolution
 
 Only available when the feature gate implements `TraceableFeatureGate`.
 
@@ -248,7 +248,7 @@ snapshot := templates.Snapshot{
         "dashboard": {
             Key:    "dashboard",
             Value:  true,
-            Source: gate.SourceOverride,
+            Source: gate.ResolveSourceOverride,
         },
     },
 }
@@ -310,7 +310,7 @@ Now use in templates:
 ```go
 data := pongo2.Context{
     "ctx":      r.Context(),
-    "scope":    scopeSet,
+    "scope":    scopeChain,
     "features": snapshot,
 }
 ```
@@ -364,9 +364,10 @@ Pass scope explicitly in template data:
 
 ```go
 data := pongo2.Context{
-    "feature_scope": gate.ScopeSet{
-        TenantID: "acme",
-        UserID:   "user-123",
+    "feature_scope": gate.ScopeChain{
+        {Kind: gate.ScopeUser, ID: "user-123", TenantID: "acme"},
+        {Kind: gate.ScopeTenant, ID: "acme", TenantID: "acme"},
+        {Kind: gate.ScopeSystem},
     },
 }
 ```

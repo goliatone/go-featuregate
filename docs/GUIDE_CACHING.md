@@ -1,5 +1,8 @@
 # Caching Guide
 
+> **API Status (2026-02-18):** Current go-featuregate APIs use `gate.ScopeRef`, `gate.ScopeChain`, `gate.WithScopeChain`, and `resolver.WithClaimsProvider`. Some snippets in this guide still use legacy `ScopeSet`/`WithScopeSet`; translate them using `../MIGRATION.md`.
+
+
 This guide covers implementing caching for feature flag resolution in go-featuregate.
 
 ## Overview

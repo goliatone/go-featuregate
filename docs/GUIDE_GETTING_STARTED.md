@@ -127,11 +127,12 @@ func main() {
     )
 
     ctx := context.Background()
-    scope := gate.ScopeSet{TenantID: "acme-corp"}
+    scope := gate.ScopeRef{Kind: gate.ScopeTenant, ID: "acme-corp", TenantID: "acme-corp"}
+    chain := gate.ScopeChain{scope, {Kind: gate.ScopeSystem}}
     actor := gate.ActorRef{ID: "admin-1", Type: "user", Name: "Admin"}
 
     // Check default value
-    enabled, err := featureGate.Enabled(ctx, "beta.features", gate.WithScopeSet(scope))
+    enabled, err := featureGate.Enabled(ctx, "beta.features", gate.WithScopeChain(chain))
     if err != nil {
         log.Fatal(err)
     }
@@ -142,7 +143,7 @@ func main() {
         log.Fatal(err)
     }
 
-    enabled, err = featureGate.Enabled(ctx, "beta.features", gate.WithScopeSet(scope))
+    enabled, err = featureGate.Enabled(ctx, "beta.features", gate.WithScopeChain(chain))
     if err != nil {
         log.Fatal(err)
     }
@@ -153,7 +154,7 @@ func main() {
         log.Fatal(err)
     }
 
-    enabled, err = featureGate.Enabled(ctx, "beta.features", gate.WithScopeSet(scope))
+    enabled, err = featureGate.Enabled(ctx, "beta.features", gate.WithScopeChain(chain))
     if err != nil {
         log.Fatal(err)
     }
@@ -199,24 +200,24 @@ When you call `Enabled()`, the gate checks sources in this order:
 Scopes allow different feature states for different contexts:
 
 ```go
-// System-wide (no tenant/org/user)
-systemScope := gate.ScopeSet{System: true}
+// Scope targets for runtime Set/Unset.
+systemScope := gate.ScopeRef{Kind: gate.ScopeSystem}
+tenantScope := gate.ScopeRef{Kind: gate.ScopeTenant, ID: "acme", TenantID: "acme"}
+orgScope := gate.ScopeRef{Kind: gate.ScopeOrg, ID: "engineering", TenantID: "acme", OrgID: "engineering"}
+userScope := gate.ScopeRef{Kind: gate.ScopeUser, ID: "user-123", TenantID: "acme", OrgID: "engineering"}
 
-// Tenant-specific
-tenantScope := gate.ScopeSet{TenantID: "acme"}
-
-// User-specific (most specific)
-userScope := gate.ScopeSet{
-    TenantID: "acme",
-    OrgID:    "engineering",
-    UserID:   "user-123",
+// Resolution chain for feature checks.
+chain := gate.ScopeChain{
+    userScope,
+    orgScope,
+    tenantScope,
+    {Kind: gate.ScopeSystem},
 }
 ```
 
 Resolution precedence: User > Org > Tenant > System
 
-If `System` is true, tenant/org/user IDs are ignored and scope resolves at
-system level.
+`Enabled`/`ResolveWithTrace` evaluate a `ScopeChain`; `Set`/`Unset` target one `ScopeRef`.
 
 ### Actors
 
@@ -229,13 +230,13 @@ actor := gate.ActorRef{
     Name: "Jane Admin",
 }
 
-featureGate.Set(ctx, "feature.key", scope, true, actor)
+featureGate.Set(ctx, "feature.key", tenantScope, true, actor)
 ```
 
 ## Configuration Options
 
 The snippets in this section assume the defaults and override store setup from the
-Quick Start examples (including `featureGate`, `ctx`, `scope`, and imports), and
+Quick Start examples (including `featureGate`, `ctx`, `scope`, `chain`, and imports), and
 focus on the specific option being added. For reference, this section typically
 needs `context`, `log`, and the `gate`, `resolver`, `activity`, and `cache` packages.
 
@@ -293,7 +294,7 @@ if !ok {
 ```
 
 ```go
-enabled, trace, err := traceable.ResolveWithTrace(ctx, "dashboard", gate.WithScopeSet(scope))
+enabled, trace, err := traceable.ResolveWithTrace(ctx, "dashboard", gate.WithScopeChain(chain))
 if err != nil {
     log.Fatal(err)
 }

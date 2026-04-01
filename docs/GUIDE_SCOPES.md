@@ -332,10 +332,8 @@ Premium features for specific tenants:
 
 ```go
 func checkPremiumFeature(ctx context.Context, featureKey string) bool {
-    // Get tenant from context
-    scopeSet := scope.FromContext(ctx)
-
-    enabled, _ := featureGate.Enabled(ctx, featureKey, gate.WithScopeSet(scopeSet))
+    // Claims are derived from context; no explicit override needed.
+    enabled, _ := featureGate.Enabled(ctx, featureKey)
     return enabled
 }
 
