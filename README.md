@@ -198,9 +198,9 @@ to control the `updated_by` audit value.
 Derive scope and actor metadata from go-auth (import from `github.com/goliatone/go-auth/adapters/featuregate`):
 
 ```go
-scopeResolver := goauthadapter.NewScopeResolver()
+claimsProvider := goauthadapter.NewClaimsProvider()
 gate := resolver.New(
-	resolver.WithScopeResolver(scopeResolver),
+	resolver.WithClaimsProvider(claimsProvider),
 )
 ```
 
@@ -217,7 +217,7 @@ funcs := templates.TemplateHelpers(gate)
 Standard template data keys (override with helper options):
 
 - `feature_ctx`: `context.Context` or any value implementing `Context() context.Context`
-- `feature_scope`: `gate.ScopeSet` (or `map[string]any` with `tenant_id`, `org_id`, `user_id`)
+- `feature_scope`: `gate.ScopeChain`, `gate.ScopeRef`, or `map[string]any` with `tenant_id`, `org_id`, `user_id`
 - `feature_snapshot`: precomputed values (`templates.Snapshot`, `map[string]bool`, or map of traces)
 
 Resolution order:
