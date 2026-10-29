@@ -52,3 +52,6 @@ Temporary Items
 # Go workspace file
 go.work
 .tmp
+.claude/
+.codex/
+.ctx/
