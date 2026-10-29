@@ -1,5 +1,23 @@
 # Changelog
 
+# [0.6.3](https://github.com/goliatone/go-featuregate/compare/v0.6.2...v0.6.3) - (2026-10-29)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Templates and error output ([8be241c](https://github.com/goliatone/go-featuregate/commit/8be241c6e9a3b62bbe5c72d0ab2edbae1df978e8))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.6.3 ([aeb82a0](https://github.com/goliatone/go-featuregate/commit/aeb82a0d01125dcef0eaf33fb29c09729b3e4900))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.6.2 ([49a0d72](https://github.com/goliatone/go-featuregate/commit/49a0d72a712d32ddd07daa7fba7e27341ba9f808))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update docs ([a73d2fe](https://github.com/goliatone/go-featuregate/commit/a73d2febdf9211cdacbbdb304db592705603676e))  - (goliatone)
+
 # [0.6.2](https://github.com/goliatone/go-featuregate/compare/v0.6.1...v0.6.2) - (2026-10-29)
 
 ## <!-- 13 -->📦 Bumps
