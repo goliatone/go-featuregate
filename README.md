@@ -246,6 +246,9 @@ Structured helper errors use the `go-errors` public renderer. `TemplateError.Con
 logs use the log renderer and include a safe summary and approved attributes, without raw
 errors or arbitrary metadata.
 
+`feature_trace` also sanitizes nested errors in live and snapshot results. Resolver and
+snapshot APIs retain the original diagnostic traces for Go callers.
+
 ## Examples
 
 - `examples/config_only/main.go` shows config defaults only (no runtime store).

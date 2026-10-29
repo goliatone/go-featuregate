@@ -260,7 +260,7 @@ func (h *helperSet) featureTrace(execCtx *pongo2.ExecutionContext, key any) any 
 	}
 	if snapshot := h.snapshot(execCtx); snapshot != nil {
 		if trace, ok := snapshotTrace(snapshot, normalized); ok {
-			return trace
+			return templateTrace(trace)
 		}
 	}
 	if h.trace == nil {
@@ -273,7 +273,36 @@ func (h *helperSet) featureTrace(execCtx *pongo2.ExecutionContext, key any) any 
 	if err != nil {
 		return h.errorOrFallback("feature_trace", err, nil)
 	}
+	return templateTrace(trace)
+}
+
+// templateTrace replaces errors on a value copy, preserving the original
+// diagnostic trace returned by resolvers and snapshot readers.
+func templateTrace(trace gate.ResolveTrace) gate.ResolveTrace {
+	trace.Override.Error = templateTraceError(trace.Override.Error)
+	trace.Default.Error = templateTraceError(trace.Default.Error)
 	return trace
+}
+
+func templateTraceError(err error) error {
+	public, _ := templateErrorRenderer.Public(err)
+	if public == nil {
+		return nil
+	}
+	return publicTraceError{PublicError: *public}
+}
+
+// publicTraceError exposes only renderer-produced public fields to templates.
+// It deliberately has no cause or reference to the diagnostic error.
+type publicTraceError struct {
+	goerrors.PublicError
+}
+
+func (e publicTraceError) Error() string {
+	if e.TextCode != "" {
+		return fmt.Sprintf("[%s:%s] %s", e.Category, e.TextCode, e.Message)
+	}
+	return fmt.Sprintf("[%s] %s", e.Category, e.Message)
 }
 
 func (h *helperSet) resolveValue(execCtx *pongo2.ExecutionContext, key string) (bool, error) {

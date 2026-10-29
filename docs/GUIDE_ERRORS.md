@@ -255,31 +255,46 @@ err := ferrors.WrapInternal(err, "ASSERTION_FAILED", "unexpected nil value", met
 
 ### HTTP Error Mapping
 
-```go
-func featureErrorToHTTP(err error) (int, map[string]any) {
-    if rich, ok := ferrors.As(err); ok {
-        response := map[string]any{
-            "error":   rich.TextCode,
-            "message": rich.Message,
-        }
+Create a public renderer once during setup and pass it to response helpers:
 
-        switch rich.Category {
-        case goerrors.CategoryBadInput:
-            return http.StatusBadRequest, response
-        case goerrors.CategoryOperation:
-            return http.StatusUnprocessableEntity, response
-        case goerrors.CategoryExternal:
-            return http.StatusServiceUnavailable, response
-        case goerrors.CategoryInternal:
-            return http.StatusInternalServerError, response
-        default:
-            return http.StatusInternalServerError, response
-        }
+```go
+publicRenderer, err := goerrors.NewRenderer(goerrors.OutputPublic)
+if err != nil {
+    return err
+}
+```
+
+Use the renderer's safe result even when it reports a sanitization failure. Never fall
+back to `err.Error()` or the original `rich.Message` when building a public response.
+
+```go
+func featureErrorToHTTP(renderer *goerrors.Renderer, err error) (int, map[string]any) {
+    if err == nil {
+        return http.StatusOK, nil
     }
 
-    return http.StatusInternalServerError, map[string]any{
+    response := map[string]any{
         "error":   "INTERNAL_ERROR",
-        "message": err.Error(),
+        "message": "An unexpected error occurred.",
+    }
+    public, _ := renderer.Public(err)
+    if public == nil {
+        return http.StatusInternalServerError, response
+    }
+    if public.TextCode != "" {
+        response["error"] = public.TextCode
+    }
+    response["message"] = public.Message
+
+    switch public.Category {
+    case goerrors.CategoryBadInput:
+        return http.StatusBadRequest, response
+    case goerrors.CategoryOperation:
+        return http.StatusUnprocessableEntity, response
+    case goerrors.CategoryExternal:
+        return http.StatusServiceUnavailable, response
+    default:
+        return http.StatusInternalServerError, response
     }
 }
 ```
@@ -536,17 +551,19 @@ if rich, ok := ferrors.As(err); ok {
 
 ### 4. Don't Expose Internal Details
 
+Reuse the public renderer from setup for every error category, including `BadInput`.
+An error's category does not make its raw message safe to expose.
+
 ```go
-func publicError(err error) string {
-    if rich, ok := ferrors.As(err); ok {
-        switch rich.Category {
-        case goerrors.CategoryBadInput:
-            return rich.Message // Safe to expose
-        default:
-            return "An error occurred" // Hide internal details
-        }
+func publicError(renderer *goerrors.Renderer, err error) string {
+    if err == nil {
+        return ""
     }
-    return "An error occurred"
+    public, _ := renderer.Public(err)
+    if public == nil {
+        return "An unexpected error occurred."
+    }
+    return public.Message
 }
 ```
 

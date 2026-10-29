@@ -199,6 +199,13 @@ Returns a `ResolveTrace` object with:
 
 Only available when the feature gate implements `TraceableFeatureGate`.
 
+Both live and snapshot results are copies with public-rendered errors in `Override.Error`
+and `Default.Error`. Templates can read safe fields such as `Message`, `Category`, and
+`TextCode`; raw messages, causes, metadata, locations, and stacks are unavailable. This
+applies regardless of `WithStructuredErrors`. Non-error trace fields are unchanged.
+`ResolveWithTrace`, `Snapshot.Trace`, and custom snapshot readers retain their original
+diagnostic errors for Go callers.
+
 ## Resolution Strategies
 
 ### Live Resolution
