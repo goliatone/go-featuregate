@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"strings"
 
@@ -353,7 +354,7 @@ func (g *Gate) Set(ctx context.Context, key string, scopeRef gate.ScopeRef, enab
 		Scope:         scopeRef,
 		Actor:         actor,
 		Action:        activity.ActionSet,
-		Value:         boolPtr(enabled),
+		Value:         new(enabled),
 	})
 	return nil
 }
@@ -614,8 +615,9 @@ func (g *Gate) emitUpdate(ctx context.Context, event activity.UpdateEvent) {
 	}
 }
 
+//go:fix inline
 func boolPtr(value bool) *bool {
-	return &value
+	return new(value)
 }
 
 type contextClaimsProvider struct{}
@@ -905,12 +907,7 @@ const (
 )
 
 func containsGroup(groups []groupKind, target groupKind) bool {
-	for _, group := range groups {
-		if group == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(groups, target)
 }
 
 func collectGroupMatches(group groupKind, chain gate.ScopeChain, matchMap map[string]store.OverrideMatch) []store.OverrideMatch {
@@ -953,7 +950,7 @@ func evaluateGroup(group groupKind, matches []store.OverrideMatch) (OverrideDeci
 		for _, match := range matches {
 			if match.Override.State == gate.OverrideStateDisabled {
 				trace.State = gate.OverrideStateDisabled
-				trace.Value = boolPtr(false)
+				trace.Value = new(false)
 				trace.Match = match.Scope
 				return OverrideDecision{
 					Matched:  true,
@@ -967,7 +964,7 @@ func evaluateGroup(group groupKind, matches []store.OverrideMatch) (OverrideDeci
 		for _, match := range matches {
 			if match.Override.State == gate.OverrideStateEnabled {
 				trace.State = gate.OverrideStateEnabled
-				trace.Value = boolPtr(true)
+				trace.Value = new(true)
 				trace.Match = match.Scope
 				return OverrideDecision{
 					Matched:  true,
@@ -982,7 +979,7 @@ func evaluateGroup(group groupKind, matches []store.OverrideMatch) (OverrideDeci
 		for _, match := range matches {
 			if match.Override.State == gate.OverrideStateEnabled {
 				trace.State = gate.OverrideStateEnabled
-				trace.Value = boolPtr(true)
+				trace.Value = new(true)
 				trace.Match = match.Scope
 				return OverrideDecision{
 					Matched:  true,
@@ -994,7 +991,7 @@ func evaluateGroup(group groupKind, matches []store.OverrideMatch) (OverrideDeci
 			}
 			if match.Override.State == gate.OverrideStateDisabled {
 				trace.State = gate.OverrideStateDisabled
-				trace.Value = boolPtr(false)
+				trace.Value = new(false)
 				trace.Match = match.Scope
 				return OverrideDecision{
 					Matched:  true,
@@ -1035,10 +1032,10 @@ func normalizeMatches(matches []store.OverrideMatch) []store.OverrideMatch {
 
 func valueFromOverride(override store.Override) *bool {
 	if override.State == gate.OverrideStateEnabled {
-		return boolPtr(true)
+		return new(true)
 	}
 	if override.State == gate.OverrideStateDisabled {
-		return boolPtr(false)
+		return new(false)
 	}
 	return nil
 }

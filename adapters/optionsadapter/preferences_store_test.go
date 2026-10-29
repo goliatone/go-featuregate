@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"sort"
 	"testing"
@@ -34,9 +35,7 @@ func (m *memoryPreferencesStore) Resolve(_ context.Context, input PreferencesRes
 	combined := map[string]any{}
 	for _, level := range input.Levels {
 		bucket := m.data[m.bucketKey(level, input.Scope)]
-		for key, value := range bucket {
-			combined[key] = value
-		}
+		maps.Copy(combined, bucket)
 	}
 	if len(input.Keys) > 0 {
 		filtered := map[string]any{}
@@ -61,9 +60,7 @@ func (m *memoryPreferencesStore) Upsert(_ context.Context, input PreferencesUpse
 	if m.data[key] == nil {
 		m.data[key] = map[string]any{}
 	}
-	for prefKey, value := range input.Values {
-		m.data[key][prefKey] = value
-	}
+	maps.Copy(m.data[key], input.Values)
 	return PreferencesSnapshot{Effective: cloneAnyMap(m.data[key])}, nil
 }
 
@@ -102,9 +99,7 @@ func cloneAnyMap(values map[string]any) map[string]any {
 		return nil
 	}
 	out := make(map[string]any, len(values))
-	for key, value := range values {
-		out[key] = value
-	}
+	maps.Copy(out, values)
 	return out
 }
 

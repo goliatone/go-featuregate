@@ -127,8 +127,9 @@ Common metadata keys include `feature_key`, `feature_key_norm`, `scope`, `store`
 `domain`, `table`, `operation`, `strict`, and `path`.
 
 Use `ferrors.WrapSentinel` to preserve `errors.Is` behavior for sentinel errors and
-`ferrors.WrapExternal` when wrapping dependency failures. Use `ferrors.As` to extract the rich
-error payload for logging or template output.
+`ferrors.WrapExternal` when wrapping dependency failures. Use `ferrors.As` to inspect rich
+errors internally. At output boundaries, use the `go-errors` public or log renderer; raw
+messages, causes, and arbitrary metadata are not public output.
 
 ## Adapters
 
@@ -239,6 +240,11 @@ Helper options let you override template data keys (`WithContextKey`, `WithScope
 `WithSnapshotKey`), enable structured errors (`WithStructuredErrors`), or log helper failures
 (`WithErrorLogging`, `WithLogger`). When `feature_snapshot` includes trace data, `feature_trace`
 prefers it before calling the gate.
+
+Structured helper errors use the `go-errors` public renderer. `TemplateError.Context` and
+`TemplateError.Metadata` remain available for source compatibility but are left nil. Helper
+logs use the log renderer and include a safe summary and approved attributes, without raw
+errors or arbitrary metadata.
 
 ## Examples
 

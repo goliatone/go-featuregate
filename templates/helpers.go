@@ -3,9 +3,11 @@ package templates
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/flosch/pongo2/v6"
+	goerrors "github.com/goliatone/go-errors"
 
 	"github.com/goliatone/go-featuregate/ferrors"
 	"github.com/goliatone/go-featuregate/gate"
@@ -18,6 +20,19 @@ const (
 	TemplateScopeKey    = "feature_scope"
 	TemplateSnapshotKey = "feature_snapshot"
 )
+
+var (
+	templateErrorRenderer = newErrorRenderer(goerrors.OutputPublic)
+	helperLogRenderer     = newErrorRenderer(goerrors.OutputLog)
+)
+
+func newErrorRenderer(output goerrors.OutputContext) *goerrors.Renderer {
+	renderer, err := goerrors.NewRenderer(output)
+	if err != nil {
+		panic("featuregate: initialize error renderer: " + err.Error())
+	}
+	return renderer
+}
 
 // HelperConfig configures template helpers.
 type HelperConfig struct {
@@ -352,39 +367,35 @@ func (h *helperSet) errorOrFallback(helper string, err error, fallback any) any 
 	return fallback
 }
 
-// TemplateError provides structured helper error output.
+// TemplateError provides public-safe structured helper error output.
 type TemplateError struct {
-	Helper   string         `json:"helper"`
-	Type     string         `json:"type,omitempty"`
-	Message  string         `json:"message,omitempty"`
-	Category string         `json:"category,omitempty"`
-	TextCode string         `json:"text_code,omitempty"`
-	Context  map[string]any `json:"context,omitempty"`
+	Helper   string `json:"helper"`
+	Type     string `json:"type,omitempty"`
+	Message  string `json:"message,omitempty"`
+	Category string `json:"category,omitempty"`
+	TextCode string `json:"text_code,omitempty"`
+	// Deprecated: retained for source compatibility; helpers leave Context nil.
+	Context map[string]any `json:"context,omitempty"`
+	// Deprecated: retained for source compatibility; helpers leave Metadata nil.
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 func templateError(helper string, err error) TemplateError {
 	out := TemplateError{Helper: helper}
-	if err == nil {
+	// A sanitization failure still returns usable, safe output. Never fall back
+	// to the original message or metadata at the template boundary.
+	public, _ := templateErrorRenderer.Public(err)
+	if public == nil {
 		return out
 	}
-	if rich, ok := ferrors.As(err); ok {
-		out.Message = rich.Message
-		out.Category = rich.Category.String()
-		out.TextCode = rich.TextCode
-		if len(rich.Metadata) > 0 {
-			out.Metadata = rich.Metadata
-			out.Context = rich.Metadata
-		}
-		if out.TextCode != "" {
-			out.Type = out.TextCode
-		} else if out.Category != "" {
-			out.Type = out.Category
-		}
-		return out
+	out.Message = public.Message
+	out.Category = public.Category.String()
+	out.TextCode = public.TextCode
+	if out.TextCode != "" {
+		out.Type = out.TextCode
+	} else if out.Category != "" {
+		out.Type = out.Category
 	}
-	out.Message = err.Error()
-	out.Type = "error"
 	return out
 }
 
@@ -640,9 +651,7 @@ func templateData(execCtx *pongo2.ExecutionContext) map[string]any {
 		return nil
 	}
 	data := make(map[string]any, len(execCtx.Public))
-	for key, value := range execCtx.Public {
-		data[key] = value
-	}
+	maps.Copy(data, execCtx.Public)
 	return data
 }
 
@@ -664,19 +673,19 @@ func splitPath(path string) []string {
 }
 
 func (h *helperSet) logHelperError(helper string, err error) {
-	if h == nil || h.cfg.Logger == nil {
+	if h == nil || h.cfg.Logger == nil || err == nil {
 		return
 	}
+	record, renderErr := helperLogRenderer.Log(err)
 	args := []any{
 		"helper", helper,
-		"error", err,
+		"error", record.Message,
 	}
-	if rich, ok := ferrors.As(err); ok {
-		args = append(args,
-			"category", rich.Category,
-			"text_code", rich.TextCode,
-			"metadata", rich.Metadata,
-		)
+	for _, attr := range record.Attributes {
+		args = append(args, attr.Key, attr.Value.Any())
+	}
+	if renderErr != nil {
+		args = append(args, "sanitization_failed", true)
 	}
 	h.cfg.Logger.Error("featuregate.helper_error", args...)
 }

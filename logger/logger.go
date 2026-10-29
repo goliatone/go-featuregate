@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"sync"
 )
@@ -60,9 +61,7 @@ func (l *BasicLogger) WithFields(fields map[string]any) Logger {
 	if merged == nil {
 		merged = make(map[string]any, len(fields))
 	}
-	for key, value := range fields {
-		merged[key] = value
-	}
+	maps.Copy(merged, fields)
 	return &BasicLogger{
 		Writer: l.Writer,
 		fields: merged,
@@ -111,9 +110,7 @@ func copyFields(fields map[string]any) map[string]any {
 		return nil
 	}
 	out := make(map[string]any, len(fields))
-	for key, value := range fields {
-		out[key] = value
-	}
+	maps.Copy(out, fields)
 	return out
 }
 

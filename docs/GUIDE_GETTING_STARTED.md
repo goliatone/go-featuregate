@@ -17,7 +17,7 @@ go-featuregate provides feature flag management with:
 go get github.com/goliatone/go-featuregate
 ```
 
-Requires Go 1.24+.
+Requires Go 1.26.0 or newer.
 
 New project quick start:
 

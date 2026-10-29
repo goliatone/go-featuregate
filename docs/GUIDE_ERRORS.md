@@ -286,24 +286,28 @@ func featureErrorToHTTP(err error) (int, map[string]any) {
 
 ### Logging Errors
 
+Create a log renderer once and pass its safe summary and attributes to your logger:
+
 ```go
-func logFeatureError(logger logger.Logger, err error) {
+renderer, err := goerrors.NewRenderer(goerrors.OutputLog)
+if err != nil {
+    return err
+}
+```
+
+```go
+func logFeatureError(logger logger.Logger, renderer *goerrors.Renderer, err error) {
     if err == nil {
         return
     }
 
-    args := []any{"error", err}
-
-    if rich, ok := ferrors.As(err); ok {
-        args = append(args,
-            "text_code", rich.TextCode,
-            "category", rich.Category.String(),
-        )
-
-        // Add all metadata
-        for key, value := range rich.Metadata {
-            args = append(args, key, value)
-        }
+    record, renderErr := renderer.Log(err)
+    args := []any{"error", record.Message}
+    for _, attr := range record.Attributes {
+        args = append(args, attr.Key, attr.Value.Any())
+    }
+    if renderErr != nil {
+        args = append(args, "sanitization_failed", true)
     }
 
     logger.Error("feature gate error", args...)
@@ -344,6 +348,11 @@ func withRetry(ctx context.Context, fn func() error) error {
 ```
 
 ### Template Error Handling
+
+Structured template errors use the public renderer's messages and classification. The
+legacy `Context` and `Metadata` fields remain nil; JSON output omits them. Original errors
+and their causes remain available to Go callers for `errors.Is`, `errors.As`, and internal
+inspection.
 
 In Pongo2 templates with structured errors enabled:
 

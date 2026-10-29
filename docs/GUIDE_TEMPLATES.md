@@ -317,7 +317,7 @@ data := pongo2.Context{
 
 ### Structured Errors
 
-Enable structured error output for debugging:
+Enable public-safe structured error output:
 
 ```go
 helpers := templates.TemplateHelpers(featureGate,
@@ -334,10 +334,15 @@ type TemplateError struct {
     Message  string         `json:"message,omitempty"`
     Category string         `json:"category,omitempty"`
     TextCode string         `json:"text_code,omitempty"`
-    Context  map[string]any `json:"context,omitempty"`
-    Metadata map[string]any `json:"metadata,omitempty"`
+    Context  map[string]any `json:"context,omitempty"`  // Deprecated; always nil in helper output.
+    Metadata map[string]any `json:"metadata,omitempty"` // Deprecated; always nil in helper output.
 }
 ```
+
+Messages, categories, and text codes come from the `go-errors` public renderer. For example,
+a backend failure has the message `An external service error occurred.` Plain errors use
+the `internal` category and `An unexpected error occurred.` Raw messages, causes, and
+metadata are not exposed. `Type` is the text code when present, otherwise the category.
 
 ### Error Logging
 
@@ -354,7 +359,10 @@ helpers := templates.TemplateHelpers(featureGate,
 )
 ```
 
-Errors are logged at ERROR level with helper name, error details, and metadata.
+Errors are logged at ERROR level as `featuregate.helper_error`, with the helper name, a
+sanitized error summary, and attributes from the `go-errors` log renderer. These include
+category, severity, and any text code, numeric code, or request ID. Raw error objects,
+causes, stacks, and arbitrary metadata are not passed to the logger.
 
 ## Passing Scope
 

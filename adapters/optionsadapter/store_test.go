@@ -2,6 +2,7 @@ package optionsadapter
 
 import (
 	"context"
+	"maps"
 	"sync"
 	"testing"
 
@@ -65,9 +66,7 @@ func cloneSnapshot(snapshot map[string]any) map[string]any {
 		return nil
 	}
 	out := make(map[string]any, len(snapshot))
-	for key, value := range snapshot {
-		out[key] = value
-	}
+	maps.Copy(out, snapshot)
 	return out
 }
 

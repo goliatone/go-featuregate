@@ -153,7 +153,7 @@ func (s *Store) Set(ctx context.Context, key string, scopeRef gate.ScopeRef, ena
 		return err
 	}
 	scope := scopeKeyFromRef(scopeRef)
-	return s.upsert(ctx, normalized, scope, boolPtr(enabled), actor)
+	return s.upsert(ctx, normalized, scope, new(enabled), actor)
 }
 
 // Unset implements store.Writer.
@@ -260,8 +260,9 @@ func normalizeKey(key string) (string, error) {
 	return normalized, nil
 }
 
+//go:fix inline
 func boolPtr(value bool) *bool {
-	return &value
+	return new(value)
 }
 
 type scopeKey struct {

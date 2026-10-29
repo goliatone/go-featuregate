@@ -3,6 +3,7 @@ package optionsadapter
 import (
 	"context"
 	"errors"
+	"maps"
 	"strings"
 
 	goerrors "github.com/goliatone/go-errors"
@@ -493,9 +494,7 @@ func scopeMetaWrap(err error, ref state.Ref, operation string) error {
 	}
 	meta := preferencesMeta(ref, operation)
 	if rich, ok := ferrors.As(err); ok {
-		for key, value := range rich.Metadata {
-			meta[key] = value
-		}
+		maps.Copy(meta, rich.Metadata)
 	}
 	return ferrors.WrapSentinel(
 		ErrPreferencesScopeMetadataInvalid,
@@ -510,9 +509,7 @@ func pathMetaWrap(err error, ref state.Ref, operation string) error {
 	}
 	meta := preferencesMeta(ref, operation)
 	if rich, ok := ferrors.As(err); ok {
-		for key, value := range rich.Metadata {
-			meta[key] = value
-		}
+		maps.Copy(meta, rich.Metadata)
 	}
 	return ferrors.WrapSentinel(
 		ErrPreferencesPathInvalid,

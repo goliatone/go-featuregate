@@ -18,7 +18,7 @@ func TestPreferencesStoreAdapterExternalCompile(t *testing.T) {
 	tmp := t.TempDir()
 	goMod := fmt.Sprintf(`module example.com/preferencesadaptercompile
 
-go 1.24
+go 1.26.0
 
 require github.com/goliatone/go-featuregate v0.0.0
 
